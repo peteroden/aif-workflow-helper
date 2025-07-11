@@ -1,0 +1,32 @@
+{
+  "id": "asst_wxZdyDjHWWuDeoxBrSynR4tW",
+  "object": "assistant",
+  "created_at": 1752188861,
+  "name": "top",
+  "description": null,
+  "model": "gpt-4.1",
+  "instructions": "",
+  "tools": [
+    {
+      "type": "connected_agent",
+      "connected_agent": {
+        "name": "call_sub_one",
+        "description": null,
+        "id": "asst_Seqos4ZropuM77HYuKzSwSXD"
+      }
+    },
+    {
+      "type": "connected_agent",
+      "connected_agent": {
+        "name": "call_sub_two",
+        "description": null,
+        "id": "asst_rbxpujh54ZlTrGbq0x6fz3y2"
+      }
+    }
+  ],
+  "top_p": 1,
+  "temperature": 1,
+  "tool_resources": {},
+  "metadata": {},
+  "response_format": "auto"
+}

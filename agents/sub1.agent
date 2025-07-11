@@ -1,0 +1,15 @@
+{
+  "id": "asst_pOWR01oEBKaqWTAi9mZ2H1N4",
+  "object": "assistant",
+  "created_at": 1752188432,
+  "name": "sub1",
+  "description": null,
+  "model": "gpt-4.1",
+  "instructions": "",
+  "tools": [],
+  "top_p": 1,
+  "temperature": 1,
+  "tool_resources": {},
+  "metadata": {},
+  "response_format": "auto"
+}
