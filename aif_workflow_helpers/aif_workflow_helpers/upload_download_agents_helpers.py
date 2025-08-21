@@ -161,7 +161,6 @@ def download_agent(agent_name, agent_client, file_path: str | None = None, prefi
     # add a check to make sure the prefix and suffix only contains letters and/or -
     full_agent_name = f"{prefix}{agent_name}{suffix}"
     validate_agent_name(full_agent_name)
-
     agent = get_agent_by_name(full_agent_name, agent_client)
 
     base_dir = file_path or "."
@@ -176,7 +175,7 @@ def download_agent(agent_name, agent_client, file_path: str | None = None, prefi
         agent_dict = agent.as_dict()
         clean_dict = generalize_agent_dict(agent_dict, agent_client, prefix, suffix)
 
-        filename = f"{agent.name}.json"
+        filename = f"{agent_name}.json"
         full_path = f"{base_dir}/{filename}"
         try:
             with open(full_path, 'w') as f:
@@ -189,40 +188,48 @@ def download_agent(agent_name, agent_client, file_path: str | None = None, prefi
         logger.info(f"Saved agent '{agent.name}' to {full_path}")
         logger.debug(json.dumps(clean_dict, indent=2))
     else:
-        logger.warning(f"Agent with name {agent_name} not found.")
+        logger.warning(f"Agent with name {full_agent_name} not found.")
+
+def read_agent_file(file_path: str) -> dict | None:
+    """Read a single agent JSON file.
+
+    Args:
+        agent_name: Name of the agent to read
+        path: Directory path to search for agent JSON files.
+    """
+
+    try:
+        with open(file_path, 'r') as f:
+            try:
+                data = json.load(f)
+            except json.JSONDecodeError as e:
+                logger.warning(f"Skipping invalid JSON file '{file_path}': {e}")
+                return None
+            
+            agent_name = data["name"]
+            
+            if agent_name:
+                logger.info(f"Loaded agent: {agent_name}")
+                return data
+            else:
+                logger.debug(f"File '{file}' missing 'name' field; skipping")
+                return None
+    except OSError as e:
+        logger.warning(f"Could not read file '{file}': {e}")
+        return None
 
 def read_agent_files(path: str = ".") -> dict:
     """Read all agent JSON files in the specified directory
 
     Args:
         path: Directory path to search for agent JSON files.
-        prefix: Optional prefix for the Agent name. Defaults to an empty string.
-        suffix: Optional suffix for the Agent name. Defaults to an empty string.
     """
     agent_files = glob(f"{path}/*.json")
     agents_data = {}
     for file in agent_files:
-        try:
-            with open(file, 'r') as f:
-                try:
-                    data = json.load(f)
-                except json.JSONDecodeError as e:
-                    logger.warning(f"Skipping invalid JSON file '{file}': {e}")
-                    continue
-                agent_name = data["name"]
-                
-                if agent_name:
-                    print(agent_name)
-                    logger.info(f"Loaded agent: {agent_name}")
-                    agents_data[agent_name] = data
-                    
-                else:
-                    logger.debug(f"File '{file}' missing 'name' field; skipping")
-
-
-        except OSError as e:
-            logger.warning(f"Could not read file '{file}': {e}")
-    
+        agent_data = read_agent_file(file)
+        if agent_data:
+            agents_data[agent_data["name"]] = agent_data    
     return agents_data
 
 def extract_dependencies(agents_data: dict):
@@ -279,7 +286,9 @@ def create_or_update_agent(agent_data: dict, agent_client: AgentsClient, existin
         prefix: Prefix to add to agent names
         suffix: Suffix to add to agent names
     """
-    
+
+    configure_logging()
+
     # Prepare agent data for creation (resolve connected agent references and any name changes)
     clean_data = agent_data.copy()
 
@@ -312,7 +321,7 @@ def create_or_update_agent(agent_data: dict, agent_client: AgentsClient, existin
                     
                     # If we have a name_from_id field, resolve it to actual ID
                     if 'name_from_id' in connected_agent_data:
-                        agent_name_ref = prefix+connected_agent_data['name_from_id']+suffix
+                        agent_name_ref = prefix + connected_agent_data['name_from_id'] + suffix
                         
                         # Look up the actual agent ID
                         if agent_name_ref in agent_names_to_ids:
@@ -403,8 +412,8 @@ def create_or_update_agents_from_files(path: str, agent_client: AgentsClient, pr
 
     agents_dir = Path(path)
     if not agents_dir.exists() or not agents_dir.is_dir():
-        logger.error(f"ERROR: Agents directory not found: {agents_dir}", file=sys.stderr)
-
+        logger.error(f"ERROR: Agents directory not found: {agents_dir}")
+        raise ValueError(f"ERROR: Agents directory not found: {agents_dir}")
 
     try:
         print("Reading agent files...")
@@ -419,3 +428,9 @@ def create_or_update_agents_from_files(path: str, agent_client: AgentsClient, pr
 
     except Exception as e:
         logger.error(f"Error uploading agent files: {e}")
+        raise ValueError(f"Error uploading agent files: {e}")
+
+def create_or_update_agent_from_file(agent_name: str, path: str, agent_client: AgentsClient, prefix: str="", suffix: str="") -> None:
+    agent_dict = read_agent_file(f"{path}/{agent_name}.json")
+    if agent_dict:
+        create_or_update_agent(agent_data=agent_dict, agent_client=agent_client, prefix=prefix, suffix=suffix)
