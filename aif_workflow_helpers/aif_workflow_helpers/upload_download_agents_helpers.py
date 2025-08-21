@@ -212,10 +212,10 @@ def read_agent_file(file_path: str) -> dict | None:
                 logger.info(f"Loaded agent: {agent_name}")
                 return data
             else:
-                logger.debug(f"File '{file}' missing 'name' field; skipping")
+                logger.debug(f"File '{file_path}' missing 'name' field; skipping")
                 return None
     except OSError as e:
-        logger.warning(f"Could not read file '{file}': {e}")
+        logger.warning(f"Could not read file '{file_path}': {e}")
         return None
 
 def read_agent_files(path: str = ".") -> dict:
