@@ -9,6 +9,7 @@ from .upload_download_agents_helpers import (
     dependency_sort,
     create_or_update_agent,
     create_or_update_agents,
+    create_or_update_agents_from_files
 )
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     "dependency_sort",
     "create_or_update_agent",
     "create_or_update_agents",
+    "create_or_update_agents_from_files"
 ]
