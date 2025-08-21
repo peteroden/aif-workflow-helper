@@ -7,8 +7,10 @@ from pathlib import Path
 
 from aif_workflow_helpers.upload_download_agents_helpers import (
     configure_logging,
+    download_agent,
     download_agents,
-    create_or_update_agents_from_files
+    create_or_update_agents_from_files,
+    create_or_update_agent_from_file
 )
 from azure.ai.agents import AgentsClient
 from azure.identity import DefaultAzureCredential
@@ -27,7 +29,7 @@ def main():
     )
     parser.add_argument(
         "--download-agent",
-        action="store_true",
+        default="",
         help="Download existing agents instead of creating/updating from local definitions",
     )
     parser.add_argument(
@@ -37,7 +39,7 @@ def main():
     )
     parser.add_argument(
         "--upload-agent",
-        action="store_true",
+        default="",
         help="Create/update agents from local definitions",
     )
     parser.add_argument(
@@ -73,10 +75,28 @@ def main():
             endpoint=endpoint
     )
 
+    if args.download_agent:
+        if args.download_agent != "":
+            agents_dir = Path(args.agents_dir)
+            agents_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                configure_logging()
+
+                agent_name = args.download_agent
+                print("Connecting...")
+                agents = list(agent_client.list_agents())
+                print(f"Connected. Found {len(agents)} existing agents")
+
+                print(f"Downloading agent {agent_name}...")
+                download_agent(agent_name=agent_name, agent_client=agent_client,file_path=agents_dir,prefix=args.prefix,suffix=args.suffix)
+            except Exception as e:
+                print(f"Unhandled error in downloading agent: {e}")
+        else:
+            print("Agent name not provided")    
+
     if args.download_all_agents:
         agents_dir = Path(args.agents_dir)
         agents_dir.mkdir(parents=True, exist_ok=True)
-
         try:
             configure_logging()
             print("Connecting...")
@@ -96,10 +116,23 @@ def main():
             sys.exit(1)
 
         try:
-            create_or_update_agents_from_files(agents_dir, agent_client, args.prefix, args.suffix)
+            create_or_update_agents_from_files(path=agents_dir, agent_client=agent_client, prefix=args.prefix, suffix=args.suffix)
 
         except Exception as e:
             print(f"Error uploading agent files: {e}")
+
+    if args.upload_agent:
+        agents_dir = Path(args.agents_dir)
+        if not agents_dir.exists() or not agents_dir.is_dir():
+            print(f"ERROR: Agents directory not found: {agents_dir}", file=sys.stderr)
+            sys.exit(1)
+
+        agent_name = args.upload_agent
+
+        try:
+            create_or_update_agent_from_file(agent_name=agent_name, path=agents_dir, agent_client=agent_client, prefix=args.prefix, suffix=args.suffix)
+        except Exception as e:
+            print(f"Error uploading agent {agent_name}: {e}")
 
 if __name__ == "__main__":
     main()
