@@ -1,350 +1,244 @@
-"""
-Tests for dependency management functions in upload_download_agents_helpers.py
-"""
-
-from unittest.mock import patch
+import logging
+import pytest
 
 from aif_workflow_helpers.upload_download_agents_helpers import (
     extract_dependencies,
-    dependency_sort
+    dependency_sort,
+    configure_logging,
 )
 
+configure_logging()
 
-class TestExtractDependencies:
-    """Test cases for extract_dependencies function."""
+def test_extract_no_dependencies():
+    data = {
+        "agent-a": {"name": "agent-a", "tools": []},
+        "agent-b": {"name": "agent-b", "tools": [{"type": "other_tool", "config": {"setting": "value"}}]},
+    }
+    assert extract_dependencies(data) == {}
 
-    def test_extract_dependencies_no_dependencies(self):
-        """Test extraction when no dependencies exist."""
-        agents_data = {
-            "agent-a": {
-                "name": "agent-a",
-                "tools": []
-            },
-            "agent-b": {
-                "name": "agent-b",
-                "tools": [
-                    {
-                        "type": "other_tool",
-                        "config": {"setting": "value"}
-                    }
-                ]
-            }
+
+def test_extract_single_dependency():
+    data = {
+        "agent-a": {"name": "agent-a", "tools": []},
+        "agent-b": {"name": "agent-b", "tools": [
+            {"type": "connected_agent", "connected_agent": {"name_from_id": "agent-a"}}
+        ]},
+    }
+    assert extract_dependencies(data) == {"agent-b": {"agent-a"}}
+
+
+def test_extract_multiple_dependencies():
+    data = {
+        "agent-c": {"name": "agent-c", "tools": [
+            {"type": "connected_agent", "connected_agent": {"name_from_id": "agent-a"}},
+            {"type": "connected_agent", "connected_agent": {"name_from_id": "agent-b"}},
+        ]}
+    }
+    assert extract_dependencies(data) == {"agent-c": {"agent-a", "agent-b"}}
+
+
+def test_extract_unknown_agent_ignored():
+    data = {
+        "agent-a": {"name": "agent-a", "tools": [
+            {"type": "connected_agent", "connected_agent": {"name_from_id": "Unknown Agent"}}
+        ]}
+    }
+    assert extract_dependencies(data) == {}
+
+
+def test_extract_missing_name_from_id():
+    data = {
+        "agent-a": {"name": "agent-a", "tools": [
+            {"type": "connected_agent", "connected_agent": {}}
+        ]}
+    }
+    assert extract_dependencies(data) == {}
+
+
+def test_extract_mixed_tool_types():
+    data = {
+        "agent-a": {"name": "agent-a", "tools": [
+            {"type": "other_tool", "config": {"setting": "value"}},
+            {"type": "connected_agent", "connected_agent": {"name_from_id": "agent-b"}},
+            {"type": "another_tool", "config": {"another": "setting"}},
+        ]}
+    }
+    assert extract_dependencies(data) == {"agent-a": {"agent-b"}}
+
+
+# --------- negative / malformed extract_dependencies inputs ---------
+
+def test_extract_tools_not_list():
+    data = {"agent-a": {"name": "agent-a", "tools": None}}
+    assert extract_dependencies(data) == {}
+
+
+def test_extract_tool_entry_not_dict():
+    data = {"agent-a": {"name": "agent-a", "tools": ["not-a-dict"]}}
+    assert extract_dependencies(data) == {}
+
+
+def test_extract_connected_agent_not_dict():
+    data = {"agent-a": {"name": "agent-a", "tools": [
+        {"type": "connected_agent", "connected_agent": "not-a-dict"}
+    ]}}
+    assert extract_dependencies(data) == {}
+
+def test_sort_no_dependencies():
+    data = {
+        "agent-a": {"name": "agent-a", "tools": []},
+        "agent-b": {"name": "agent-b", "tools": []},
+        "agent-c": {"name": "agent-c", "tools": []},
+    }
+    order = dependency_sort(data)
+    assert set(order) == {"agent-a", "agent-b", "agent-c"}
+    assert len(order) == 3
+
+
+def test_sort_linear_chain():
+    data = {
+        "agent-a": {"name": "agent-a", "tools": []},
+        "agent-b": {"name": "agent-b", "tools": [
+            {"type": "connected_agent", "connected_agent": {"name_from_id": "agent-a"}}
+        ]},
+        "agent-c": {"name": "agent-c", "tools": [
+            {"type": "connected_agent", "connected_agent": {"name_from_id": "agent-b"}}
+        ]},
+    }
+    assert dependency_sort(data) == ["agent-a", "agent-b", "agent-c"]
+
+
+def test_sort_complex_graph():
+    data = {
+        "agent-a": {"name": "agent-a", "tools": []},
+        "agent-b": {"name": "agent-b", "tools": []},
+        "agent-c": {"name": "agent-c", "tools": [
+            {"type": "connected_agent", "connected_agent": {"name_from_id": "agent-a"}},
+            {"type": "connected_agent", "connected_agent": {"name_from_id": "agent-b"}},
+        ]},
+        "agent-d": {"name": "agent-d", "tools": [
+            {"type": "connected_agent", "connected_agent": {"name_from_id": "agent-c"}},
+        ]},
+    }
+    order = dependency_sort(data)
+    assert order.index("agent-a") < order.index("agent-c")
+    assert order.index("agent-b") < order.index("agent-c")
+    assert order.index("agent-c") < order.index("agent-d")
+
+
+def test_sort_independent_groups():
+    data = {
+        "group1-a": {"name": "group1-a", "tools": []},
+        "group1-b": {"name": "group1-b", "tools": [
+            {"type": "connected_agent", "connected_agent": {"name_from_id": "group1-a"}}
+        ]},
+        "group2-a": {"name": "group2-a", "tools": []},
+        "group2-b": {"name": "group2-b", "tools": [
+            {"type": "connected_agent", "connected_agent": {"name_from_id": "group2-a"}}
+        ]},
+    }
+    order = dependency_sort(data)
+    assert set(order) == {"group1-a", "group1-b", "group2-a", "group2-b"}
+    assert order.index("group1-a") < order.index("group1-b")
+    assert order.index("group2-a") < order.index("group2-b")
+
+
+def test_sort_branching():
+    data = {
+        "a": {"name": "a", "tools": []},
+        "b": {"name": "b", "tools": []},
+        "c": {"name": "c", "tools": [
+            {"type": "connected_agent", "connected_agent": {"name_from_id": "a"}},
+            {"type": "connected_agent", "connected_agent": {"name_from_id": "b"}},
+        ]},
+    }
+    order = dependency_sort(data)
+    assert set(order) == {"a", "b", "c"}
+    assert order.index("a") < order.index("c")
+    assert order.index("b") < order.index("c")
+
+
+def test_sort_empty():
+    assert dependency_sort({}) == []
+
+
+def test_sort_cycle(caplog: pytest.LogCaptureFixture):
+    data = {
+        "agent-a": {"name": "agent-a", "tools": [
+            {"type": "connected_agent", "connected_agent": {"name_from_id": "agent-b"}}
+        ]},
+        "agent-b": {"name": "agent-b", "tools": [
+            {"type": "connected_agent", "connected_agent": {"name_from_id": "agent-a"}}
+        ]},
+    }
+    with caplog.at_level(logging.WARNING):
+        order = dependency_sort(data)
+    assert set(order) == {"agent-a", "agent-b"}
+    assert any("Circular dependencies detected" in m for m in caplog.messages)
+
+
+def test_sort_self_dependency():
+    data = {
+        "agent-a": {"name": "agent-a", "tools": [
+            {"type": "connected_agent", "connected_agent": {"name_from_id": "agent-a"}}
+        ]}
+    }
+    assert dependency_sort(data) == ["agent-a"]
+
+    def test_extract_dependencies_empty():
+        assert extract_dependencies({}) == {}
+
+
+    def test_extract_dependencies_simple():
+        data = {
+            "a": {"name": "a", "tools": []},
+            "b": {"name": "b", "tools": [
+                {"type": "connected_agent", "connected_agent": {"name_from_id": "a"}}
+            ]}
         }
-        
-        with patch('builtins.print'):
-            result = extract_dependencies(agents_data)
-        
-        assert len(result) == 0
+        deps = extract_dependencies(data)
+        assert deps == {"b": {"a"}}
 
-    def test_extract_dependencies_simple(self):
-        """Test extraction of simple dependencies."""
-        agents_data = {
-            "agent-a": {
-                "name": "agent-a",
-                "tools": []
-            },
-            "agent-b": {
-                "name": "agent-b",
-                "tools": [
-                    {
-                        "type": "connected_agent",
-                        "connected_agent": {
-                            "name_from_id": "agent-a"
-                        }
-                    }
-                ]
-            }
+
+    def test_dependency_sort_no_deps():
+        data = {"a": {"name": "a", "tools": []}, "b": {"name": "b", "tools": []}}
+        order = dependency_sort(data)
+        assert set(order) == {"a", "b"}
+        # With no dependencies relative ordering is flexible; ensure stable subset property
+        assert len(order) == 2
+
+
+    def test_dependency_sort_linear():
+        data = {
+            "a": {"name": "a", "tools": []},
+            "b": {"name": "b", "tools": [{"type": "connected_agent", "connected_agent": {"name_from_id": "a"}}]},
+            "c": {"name": "c", "tools": [{"type": "connected_agent", "connected_agent": {"name_from_id": "b"}}]},
         }
-        
-        with patch('builtins.print') as mock_print:
-            result = extract_dependencies(agents_data)
-        
-        assert "agent-b" in result
-        assert "agent-a" in result["agent-b"]
-        mock_print.assert_called_with("  agent-b depends on agent-a")
+        order = dependency_sort(data)
+        assert order == ["a", "b", "c"]
 
-    def test_extract_dependencies_multiple_per_agent(self):
-        """Test extraction when agent has multiple dependencies."""
-        agents_data = {
-            "agent-c": {
-                "name": "agent-c",
-                "tools": [
-                    {
-                        "type": "connected_agent",
-                        "connected_agent": {
-                            "name_from_id": "agent-a"
-                        }
-                    },
-                    {
-                        "type": "connected_agent",
-                        "connected_agent": {
-                            "name_from_id": "agent-b"
-                        }
-                    }
-                ]
-            }
+
+    def test_dependency_sort_branching():
+        data = {
+            "a": {"name": "a", "tools": []},
+            "b": {"name": "b", "tools": []},
+            "c": {"name": "c", "tools": [
+                {"type": "connected_agent", "connected_agent": {"name_from_id": "a"}},
+                {"type": "connected_agent", "connected_agent": {"name_from_id": "b"}},
+            ]},
         }
-        
-        with patch('builtins.print'):
-            result = extract_dependencies(agents_data)
-        
-        assert "agent-c" in result
-        assert "agent-a" in result["agent-c"]
-        assert "agent-b" in result["agent-c"]
-        assert len(result["agent-c"]) == 2
+        order = dependency_sort(data)
+        # a & b must appear before c
+        assert set(order) == {"a", "b", "c"}
+        assert order.index("a") < order.index("c")
+        assert order.index("b") < order.index("c")
 
-    def test_extract_dependencies_unknown_agent(self):
-        """Test extraction when dependency name is 'Unknown Agent'."""
-        agents_data = {
-            "agent-a": {
-                "name": "agent-a",
-                "tools": [
-                    {
-                        "type": "connected_agent",
-                        "connected_agent": {
-                            "name_from_id": "Unknown Agent"
-                        }
-                    }
-                ]
-            }
+
+    def test_dependency_sort_cycle():
+        data = {
+            "a": {"name": "a", "tools": [{"type": "connected_agent", "connected_agent": {"name_from_id": "b"}}]},
+            "b": {"name": "b", "tools": [{"type": "connected_agent", "connected_agent": {"name_from_id": "a"}}]},
         }
-        
-        with patch('builtins.print'):
-            result = extract_dependencies(agents_data)
-        
-        assert len(result) == 0
-
-    def test_extract_dependencies_missing_name_from_id(self):
-        """Test extraction when name_from_id is missing."""
-        agents_data = {
-            "agent-a": {
-                "name": "agent-a",
-                "tools": [
-                    {
-                        "type": "connected_agent",
-                        "connected_agent": {}
-                    }
-                ]
-            }
-        }
-        
-        with patch('builtins.print'):
-            result = extract_dependencies(agents_data)
-        
-        assert len(result) == 0
-
-    def test_extract_dependencies_mixed_tools(self):
-        """Test extraction with mixed tool types."""
-        agents_data = {
-            "agent-a": {
-                "name": "agent-a",
-                "tools": [
-                    {
-                        "type": "other_tool",
-                        "config": {"setting": "value"}
-                    },
-                    {
-                        "type": "connected_agent",
-                        "connected_agent": {
-                            "name_from_id": "agent-b"
-                        }
-                    },
-                    {
-                        "type": "another_tool",
-                        "config": {"another": "setting"}
-                    }
-                ]
-            }
-        }
-        
-        with patch('builtins.print'):
-            result = extract_dependencies(agents_data)
-        
-        assert "agent-a" in result
-        assert "agent-b" in result["agent-a"]
-        assert len(result["agent-a"]) == 1
-
-
-class TestDependencySort:
-    """Test cases for dependency_sort function."""
-
-    def test_dependency_sort_no_dependencies(self):
-        """Test sorting when no dependencies exist."""
-        agents_data = {
-            "agent-a": {"name": "agent-a", "tools": []},
-            "agent-b": {"name": "agent-b", "tools": []},
-            "agent-c": {"name": "agent-c", "tools": []}
-        }
-        
-        with patch('builtins.print'):
-            result = dependency_sort(agents_data)
-        
-        # All agents should be included
-        assert len(result) == 3
-        assert set(result) == {"agent-a", "agent-b", "agent-c"}
-
-    def test_dependency_sort_linear_chain(self, agents_data_with_dependencies):
-        """Test sorting with linear dependency chain."""
-        with patch('builtins.print'):
-            result = dependency_sort(agents_data_with_dependencies)
-        
-        # Should be sorted in dependency order: a -> b -> c
-        assert result == ["agent-a", "agent-b", "agent-c"]
-
-    def test_dependency_sort_complex_dependencies(self):
-        """Test sorting with complex dependency graph."""
-        agents_data = {
-            "agent-a": {
-                "name": "agent-a",
-                "tools": []
-            },
-            "agent-b": {
-                "name": "agent-b",
-                "tools": []
-            },
-            "agent-c": {
-                "name": "agent-c",
-                "tools": [
-                    {
-                        "type": "connected_agent",
-                        "connected_agent": {
-                            "name_from_id": "agent-a"
-                        }
-                    },
-                    {
-                        "type": "connected_agent",
-                        "connected_agent": {
-                            "name_from_id": "agent-b"
-                        }
-                    }
-                ]
-            },
-            "agent-d": {
-                "name": "agent-d",
-                "tools": [
-                    {
-                        "type": "connected_agent",
-                        "connected_agent": {
-                            "name_from_id": "agent-c"
-                        }
-                    }
-                ]
-            }
-        }
-        
-        with patch('builtins.print'):
-            result = dependency_sort(agents_data)
-        
-        # Verify dependency constraints are satisfied
-        a_index = result.index("agent-a")
-        b_index = result.index("agent-b")
-        c_index = result.index("agent-c")
-        d_index = result.index("agent-d")
-        
-        assert a_index < c_index  # a before c
-        assert b_index < c_index  # b before c
-        assert c_index < d_index  # c before d
-
-    def test_dependency_sort_circular_dependencies(self):
-        """Test sorting with circular dependencies."""
-        agents_data = {
-            "agent-a": {
-                "name": "agent-a",
-                "tools": [
-                    {
-                        "type": "connected_agent",
-                        "connected_agent": {
-                            "name_from_id": "agent-b"
-                        }
-                    }
-                ]
-            },
-            "agent-b": {
-                "name": "agent-b",
-                "tools": [
-                    {
-                        "type": "connected_agent",
-                        "connected_agent": {
-                            "name_from_id": "agent-a"
-                        }
-                    }
-                ]
-            }
-        }
-        
-        with patch('builtins.print') as mock_print:
-            result = dependency_sort(agents_data)
-        
-        # Should handle circular dependencies and include all agents
-        assert len(result) == 2
-        assert set(result) == {"agent-a", "agent-b"}
-        
-        # Should print warning about circular dependencies
-        mock_print.assert_any_call("Warning: Circular dependencies detected for: {'agent-a', 'agent-b'}")
-
-    def test_dependency_sort_self_dependency(self):
-        """Test sorting when agent depends on itself."""
-        agents_data = {
-            "agent-a": {
-                "name": "agent-a",
-                "tools": [
-                    {
-                        "type": "connected_agent",
-                        "connected_agent": {
-                            "name_from_id": "agent-a"
-                        }
-                    }
-                ]
-            }
-        }
-        
-        with patch('builtins.print'):
-            result = dependency_sort(agents_data)
-        
-        # Should handle self-dependency gracefully
-        assert result == ["agent-a"]
-
-    def test_dependency_sort_independent_groups(self):
-        """Test sorting with independent groups of agents."""
-        agents_data = {
-            "group1-a": {"name": "group1-a", "tools": []},
-            "group1-b": {
-                "name": "group1-b",
-                "tools": [
-                    {
-                        "type": "connected_agent",
-                        "connected_agent": {
-                            "name_from_id": "group1-a"
-                        }
-                    }
-                ]
-            },
-            "group2-a": {"name": "group2-a", "tools": []},
-            "group2-b": {
-                "name": "group2-b",
-                "tools": [
-                    {
-                        "type": "connected_agent",
-                        "connected_agent": {
-                            "name_from_id": "group2-a"
-                        }
-                    }
-                ]
-            }
-        }
-        
-        with patch('builtins.print'):
-            result = dependency_sort(agents_data)
-        
-        # All agents should be included
-        assert len(result) == 4
-        assert set(result) == {"group1-a", "group1-b", "group2-a", "group2-b"}
-        
-        # Dependency constraints within each group should be satisfied
-        g1a_index = result.index("group1-a")
-        g1b_index = result.index("group1-b")
-        g2a_index = result.index("group2-a")
-        g2b_index = result.index("group2-b")
-        
-        assert g1a_index < g1b_index
-        assert g2a_index < g2b_index
+        order = dependency_sort(data)
+        assert set(order) == {"a", "b"}
+        assert len(order) == 2

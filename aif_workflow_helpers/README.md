@@ -40,7 +40,7 @@ PYTHONPATH=/workspaces/AIFoundry_CICD/aif_workflow_helpers python -c "from aif_w
 ```bash
 cd aif_workflow_helpers
 source /workspaces/AIFoundry_CICD/.venv/bin/activate
-PYTHONPATH=/workspaces/AIFoundry_CICD/aif_workflow_helpers python run_agents.py
+PYTHONPATH=/workspaces/AIFoundry_CICD/aif_workflow_helpers python aif_helper.py
 ```
 
 #### Option C: Run directly as module
@@ -118,8 +118,7 @@ aif_workflow_helpers/
 │   ├── __init__.py
 │   └── upload_download_agents_helpers.py
 ├── requirements.txt
-├── setup.py
-├── run_agents.py
+├── aif_helper.py
 └── README.md
 ```
 
