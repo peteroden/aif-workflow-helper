@@ -28,7 +28,8 @@ def configure_logging(level: int = logging.INFO, *, propagate: bool = True, forc
     if _configured and not force:
         _logger.setLevel(level)
         return _logger
-    _logger.handlers.clear()
+    if force and _logger.handlers:
+        _logger.handlers.clear()
     handler = logging.StreamHandler(stream)
     handler.setFormatter(logging.Formatter(fmt))
     _logger.addHandler(handler)
