@@ -4,16 +4,16 @@ import argparse
 import os
 import sys
 from pathlib import Path
+from azure.ai.agents import AgentsClient
+from azure.identity import DefaultAzureCredential
 
-from aif_workflow_helpers.upload_download_agents_helpers import (
+from aif_workflow_helpers import (
     configure_logging,
     download_agent,
     download_agents,
     create_or_update_agents_from_files,
     create_or_update_agent_from_file
 )
-from azure.ai.agents import AgentsClient
-from azure.identity import DefaultAzureCredential
 
 def main():
     parser = argparse.ArgumentParser(description="AI Foundry Agent Helper CLI")
