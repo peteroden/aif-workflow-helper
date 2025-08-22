@@ -174,7 +174,7 @@ def create_or_update_agent(agent_data: dict, agent_client: AgentsClient, existin
             return new_agent
             
     except Exception as e:
-        logger.exception(f"Error creating/updating agent {clean_data['name']}: {str(e)}")
+        logger.exception(f"Error creating/updating agent {clean_data['name']}: {e}")
         return None
 
 def create_or_update_agents(agents_data: dict, agent_client: AgentsClient, prefix: str="", suffix: str="") -> None:
