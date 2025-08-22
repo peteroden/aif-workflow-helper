@@ -2,7 +2,7 @@ from .upload_agent_helpers import (
     create_or_update_agent,
     create_or_update_agents,
     create_or_update_agent_from_file,
-    create_or_update_agents_from_files
+    create_or_update_agents_from_files,
 )
 
 from .download_agent_helpers import (
@@ -21,5 +21,5 @@ __all__ = [
     "create_or_update_agent",
     "create_or_update_agents",
     "create_or_update_agent_from_file",
-    "create_or_update_agents_from_files"
+    "create_or_update_agents_from_files",
 ]

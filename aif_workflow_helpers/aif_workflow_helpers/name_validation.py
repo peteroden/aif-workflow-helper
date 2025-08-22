@@ -9,7 +9,7 @@ def validate_agent_name(agent_name: str):
     Raises ValueError if invalid.
     """
     if not re.match(r"^[a-zA-Z0-9-]*$", agent_name):
-        logger.error(
+        logger.exception(
             f"Invalid agent name '{agent_name}'; only letters, numbers, and hyphens are allowed."
         )
         raise ValueError(

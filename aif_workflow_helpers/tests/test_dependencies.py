@@ -1,7 +1,7 @@
 import logging
 import pytest
 
-from aif_workflow_helpers.upload_download_agents_helpers import (
+from aif_workflow_helpers.upload_agent_helpers import (
     extract_dependencies,
     dependency_sort,
     configure_logging,

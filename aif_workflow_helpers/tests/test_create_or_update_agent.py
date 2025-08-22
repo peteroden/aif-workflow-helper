@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock
 import pytest
-from aif_workflow_helpers.upload_download_agents_helpers import create_or_update_agent
+from aif_workflow_helpers.upload_agent_helpers import create_or_update_agent
 
 def make_agent(name, id="id1"):
     agent = MagicMock()
@@ -43,7 +43,7 @@ def test_resolve_name_from_id():
             {"type": "connected_agent", "connected_agent": {"name_from_id": "dep-agent"}}
         ]
     }
-    result = create_or_update_agent(agent_data, client)
+    result = create_or_update_agent(agent_data, client)  # noqa: F841
     args, kwargs = client.create_agent.call_args
     found = False
     for tool in kwargs.get("tools", []):
@@ -61,7 +61,7 @@ def test_unresolved_name_from_id_warns(caplog):
             {"type": "connected_agent", "connected_agent": {"name_from_id": "missing-agent"}}
         ]
     }
-    result = create_or_update_agent(agent_data, client)
+    result = create_or_update_agent(agent_data, client)  # noqa: F841
     assert any("Could not resolve agent name" in m for m in caplog.messages)
 
 @pytest.mark.usefixtures("caplog")

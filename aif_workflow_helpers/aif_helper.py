@@ -16,6 +16,8 @@ from aif_workflow_helpers import (
 )
 
 def main():
+
+    
     parser = argparse.ArgumentParser(description="AI Foundry Agent Helper CLI")
     parser.add_argument(
         "--agents-dir",
@@ -52,8 +54,24 @@ def main():
         default="",
         help="Add a suffix to the Agent name when uploading or downloading",
     )
+    parser.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=["CRITICAL","ERROR","WARNING","INFO","DEBUG","NOTSET"],
+        help="Logging level for helper operations (default: INFO)",
+    )
 
     args = parser.parse_args()
+
+    # Initialize logging once
+    try:
+        from logging import getLevelName
+        level = getattr(__import__('logging'), args.log_level.upper(), None)
+        if not isinstance(level, int):  # fallback
+            level = getLevelName(args.log_level.upper())
+        configure_logging(level=level)
+    except Exception:  # pragma: no cover
+        configure_logging()
 
     if args.download_all_agents or args.upload_all_agents or args.download_agent or args.upload_agent:
         # Basic environment validation
@@ -80,8 +98,6 @@ def main():
             agents_dir = Path(args.agents_dir)
             agents_dir.mkdir(parents=True, exist_ok=True)
             try:
-                configure_logging()
-
                 agent_name = args.download_agent
                 print("Connecting...")
                 agents = list(agent_client.list_agents())
@@ -98,13 +114,12 @@ def main():
         agents_dir = Path(args.agents_dir)
         agents_dir.mkdir(parents=True, exist_ok=True)
         try:
-            configure_logging()
             print("Connecting...")
             agents = list(agent_client.list_agents())
             print(f"Connected. Found {len(agents)} existing agents")
 
             print("Downloading agents...")
-            download_agents(agent_client,file_path=agents_dir,prefix=args.prefix,suffix=args.suffix)
+            download_agents(agent_client, file_path=agents_dir, prefix=args.prefix, suffix=args.suffix)
         except Exception as e:
             print(f"Unhandled error in downloading agents: {e}")
     

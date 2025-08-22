@@ -1,11 +1,13 @@
 import json
+
+from .name_validation import validate_agent_name
 from glob import glob
 from collections import defaultdict
 from pathlib import Path
 from azure.ai.agents import AgentsClient, models
+from .logging_utils import logger, configure_logging  # re-exported for backward compatibility
+_configure_logging_ref = configure_logging
 
-from .logging_utils import logger, configure_logging
-from .name_validation import validate_agent_name
 
 def read_agent_file(file_path: str) -> dict | None:
     """Read a single agent JSON file.
@@ -42,7 +44,7 @@ def read_agent_files(path: str = ".") -> dict:
             agents_data[agent_data["name"]] = agent_data    
     return agents_data
 
-def extract_dependencies(agents_data: dict):
+def extract_dependencies(agents_data: dict) -> defaultdict:
     """Extract dependencies from connected agents"""
     dependencies = defaultdict(set)
     
@@ -67,7 +69,7 @@ def extract_dependencies(agents_data: dict):
     
     return dependencies
 
-def dependency_sort(agents_data: dict):
+def dependency_sort(agents_data: dict) -> list:
     """Perform sort to determine creation order based on dependencies"""
     
     agents = set(agents_data.keys())
@@ -96,8 +98,6 @@ def create_or_update_agent(agent_data: dict, agent_client: AgentsClient, existin
         prefix: Prefix to add to agent names
         suffix: Suffix to add to agent names
     """
-
-    configure_logging()
 
     # Prepare agent data for creation (resolve connected agent references and any name changes)
     clean_data = agent_data.copy()
@@ -174,7 +174,7 @@ def create_or_update_agent(agent_data: dict, agent_client: AgentsClient, existin
             return new_agent
             
     except Exception as e:
-        logger.error(f"Error creating/updating agent {clean_data['name']}: {str(e)}")
+        logger.exception(f"Error creating/updating agent {clean_data['name']}: {str(e)}")
         return None
 
 def create_or_update_agents(agents_data: dict, agent_client: AgentsClient, prefix: str="", suffix: str="") -> None:
@@ -186,7 +186,6 @@ def create_or_update_agents(agents_data: dict, agent_client: AgentsClient, prefi
         prefix: Prefix to add to agent names
         suffix: Suffix to add to agent names
     """
-    configure_logging()
     logger.info("Sort agents to create in dependency order...")
     creation_ordered_agents = dependency_sort(agents_data)
     logger.info(f"Creating/updating agents in dependency order... {creation_ordered_agents}")
