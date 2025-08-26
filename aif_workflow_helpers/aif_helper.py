@@ -69,7 +69,7 @@ def setup_logging(log_level_name: str) -> None:
     try:
         log_levels = getLevelNamesMapping()
         level = log_levels.get(log_level_name.upper())
-        configure_logging(level=level)
+        configure_logging(level=level, propagate=True)
     except Exception:  # pragma: no cover
         configure_logging()
 

@@ -7,7 +7,7 @@ from aif_workflow_helpers.upload_agent_helpers import (
     configure_logging,
 )
 
-configure_logging()
+configure_logging(propagate=True)
 
 def test_extract_no_dependencies():
     data = {

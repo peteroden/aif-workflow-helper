@@ -4,9 +4,19 @@ from .logging_utils import logger
 __all__ = ["validate_agent_name"]
 
 def validate_agent_name(agent_name: str):
-    """Validate that an agent name contains only alphanumerics and hyphens.
+    """Validate an agent name.
 
-    Raises ValueError if invalid.
+    Ensures the provided `agent_name` consists only of ASCII letters (A-Z, a-z),
+    digits (0-9), and hyphens (-). The empty string is permitted by the current
+    pattern ("*" quantifier); callers should enforce non-emptiness upstream if
+    required.
+
+    Args:
+        agent_name (str): The proposed agent name to validate.
+
+    Raises:
+        ValueError: If the name contains characters other than letters,
+            digits, or hyphens.
     """
     if not re.match(r"^[a-zA-Z0-9-]*$", agent_name):
         logger.error(

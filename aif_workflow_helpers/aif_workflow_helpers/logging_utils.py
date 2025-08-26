@@ -7,22 +7,24 @@ _DEFAULT_FORMAT = "%(asctime)s %(levelname)s %(name)s - %(message)s"
 
 _configured = False
 
-def configure_logging(level: int = logging.INFO, *, propagate: bool = True, force: bool = False,
+def configure_logging(level: int = logging.INFO, *, propagate: bool = False, force: bool = False,
                       fmt: str = _DEFAULT_FORMAT, stream=None) -> logging.Logger:
-    """Configure the shared package logger once.
+    """Configure and return the shared package logger.
 
-    Parameters
-    ----------
-    level : int
-        Logging level (default INFO).
-    propagate : bool
-        Whether to propagate to root logger.
-    force : bool
-        If True reconfigure even if already configured.
-    fmt : str
-        Log format string.
-    stream : IO
-        Optional custom stream (defaults to stderr if None).
+    Idempotently initializes the module-level logger used across helper modules.
+    Subsequent calls without `force` will only adjust the log level. Setting
+    `force=True` clears existing handlers and reconfigures from scratch.
+
+    Args:
+        level (int): Logging level to apply (default: logging.INFO).
+        propagate (bool): If True, log records propagate to the root logger.
+        force (bool): If True, always reconfigure even if already configured.
+        fmt (str): Log message format string.
+        stream (IO | None): Optional stream for the handler; defaults to
+            `sys.stderr` when None.
+
+    Returns:
+        logging.Logger: The configured shared logger instance.
     """
     global _configured
     if _configured and not force:
