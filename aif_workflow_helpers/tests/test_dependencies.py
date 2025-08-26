@@ -4,8 +4,8 @@ import pytest
 from aif_workflow_helpers.upload_agent_helpers import (
     extract_dependencies,
     dependency_sort,
-    configure_logging,
 )
+from aif_workflow_helpers.logging_utils import configure_logging
 
 configure_logging(propagate=True)
 

@@ -1,6 +1,6 @@
 # Azure AI Agents Workflow Helpers
 
-This package provides utilities for managing Azure AI Agents, including downloading, uploading, and dependency management.
+Utilities for exporting (downloading) and importing (creating/updating) Azure AI Agents along with dependency awareness, normalization, and consistent logging.
 
 ## 🚀 Quick Start
 
@@ -25,19 +25,37 @@ cd aif_workflow_helpers
 pip install -r requirements.txt
 ```
 
-### 3. Run the Script
+### 3. Using the CLI (Recommended)
 
-#### Option A: Using the CLI script (Recommended)
+The CLI wraps the helper functions and enforces environment validation.
 
 ```bash
 cd aif_workflow_helpers
-source /workspaces/AIFoundry_CICD/.venv/bin/activate
-PYTHONPATH=/workspaces/AIFoundry_CICD/aif_workflow_helpers python aif_helper.py
+python aif_helper.py --download-all-agents --agents-dir agents
 ```
 
-#### Option B: Direct module usage
+Common examples:
 
-You can import and use individual functions programmatically:
+```bash
+# Download all agents with optional prefix/suffix filtering
+python aif_helper.py --download-all-agents --prefix dev- --suffix -v1
+
+# Download a single agent
+python aif_helper.py --download-agent my_agent
+
+# Upload all agents from JSON definitions in a directory
+python aif_helper.py --upload-all-agents --agents-dir agents
+
+# Upload a single agent definition file
+python aif_helper.py --upload-agent my_agent --agents-dir agents
+
+# Change log level
+python aif_helper.py --download-all-agents --log-level DEBUG
+```
+
+### 4. Direct Library Usage
+
+You can import and compose the underlying functions directly:
 
 ```python
 from aif_workflow_helpers import (
@@ -45,9 +63,10 @@ from aif_workflow_helpers import (
     download_agents,
     download_agent,
     create_or_update_agents,
-    create_or_update_agent
+    create_or_update_agent,
+    create_or_update_agent_from_file,
+    create_or_update_agents_from_files,
 )
-
 from azure.ai.agents import AgentsClient
 from azure.identity import DefaultAzureCredential
 
@@ -61,73 +80,57 @@ client = AgentsClient(
     endpoint="your-endpoint"
 )
 
-download_agents(client, file_path="./agents")
-agents_data = read_agent_files("./agents")
-create_or_update_agents(agents_data, client)
+# Bulk download
+download_agents(client, file_path="./agents", prefix="", suffix="")
+
+# Create/update from a directory (dependency ordered)
+create_or_update_agents_from_files(path="./agents", agent_client=client, prefix="", suffix="")
 ```
 
 ## 📁 What the Tooling Does
 
-1. **Downloads all existing agents** from Azure AI Foundry to JSON files
-2. **Reads agent JSON files** from the current directory
-3. **Analyzes dependencies** between agents (connected_agent tools)
-4. **Creates/updates agents** in dependency order to avoid reference errors
+1. Downloads existing agents to normalized JSON files
+2. Normalizes (generalizes) JSON for portability (removes resource-specific fields)
+3. Infers and resolves inter-agent dependencies (connected agent tools)
+4. Creates or updates agents in dependency-safe order
+5. Applies optional prefix/suffix for environment namespacing
 
 ## 🔧 Core Functions
 
 ### Download Functions
 
-- `download_agents(agent_client, file_path, prefix, suffix)` - Download all agents (filtered by optional prefix/suffix)
-- `download_agent(agent_name, agent_client, file_path, prefix, suffix)` - Download a single agent
-- `generalize_agent_dict(data, agent_client, prefix, suffix)` - Normalize agent JSON for portability
+- `download_agents(agent_client, file_path, prefix, suffix)` – Download and generalize all agents (optional prefix/suffix filters)
+- `download_agent(agent_name, agent_client, file_path, prefix, suffix)` – Download and generalize a single agent
+- `generalize_agent_dict(data, agent_client, prefix, suffix)` – Normalize agent JSON for portability
 
-### Upload Functions  
+### Upload Functions
 
-- `read_agent_files(path)` / `read_agent_file(path)` - Read JSON definitions
-- `create_or_update_agent(agent_data, agent_client, existing_agents, prefix, suffix)` - Upsert a single agent
-- `create_or_update_agents(agents_data, agent_client, prefix, suffix)` - Upsert multiple agents (dependency ordered)
-- `create_or_update_agent_from_file(agent_name, path, agent_client, prefix, suffix)` - Upsert a specific agent file
-- `create_or_update_agents_from_files(path, agent_client, prefix, suffix)` - Convenience wrapper to load + upsert
+- `create_or_update_agent(agent_data, agent_client, existing_agents, prefix, suffix)` – Upsert a single agent object
+- `create_or_update_agents(agents_data, agent_client, prefix, suffix)` – Upsert multiple agents with dependency ordering
+- `create_or_update_agent_from_file(agent_name, path, agent_client, prefix, suffix)` – Upsert from a specific JSON file
+- `create_or_update_agents_from_files(path, agent_client, prefix, suffix)` – Bulk load and upsert directory
 
-### Dependency Management
+### Internal Helpers (Not all re-exported)
 
-- `extract_dependencies(agents_data)` - Infer connected-agent dependencies
-- `dependency_sort(agents_data)` - Topological order respecting dependencies
+- `read_agent_file(path)` / `read_agent_files(path)` – Load JSON definitions (used internally by *from_files* wrappers)
+- `extract_dependencies(agents_data)` – Build dependency graph
+- `dependency_sort(agents_data)` – Topological sort of agents
+- `get_agent_by_name(name, client)` – Lookup agent object
+- `get_agent_name(agent_id, client)` – Reverse lookup by ID
 
-### Lookup Helpers
+## 🎯 CLI Reference
 
-- `get_agent_by_name(name, client)` - Fetch agent object by name
-- `get_agent_name(agent_id, client)` - Resolve ID to name
-
-## 🎯 CLI Usage
-
-The CLI `aif_helper.py` supports the following flags:
+`aif_helper.py` arguments:
 
 ```text
---agents-dir DIR              Directory for agent JSON files (default: agents)
---download-all-agents         Download all existing agents
---download-agent NAME         Download a single agent by name
---upload-all-agents           Create/update all agents from JSON files
---upload-agent NAME           Create/update a single agent from JSON file
---prefix TEXT                 Optional prefix applied during download/upload
---suffix TEXT                 Optional suffix applied during download/upload
---log-level LEVEL             Logging level (CRITICAL, ERROR, WARNING, INFO, DEBUG)
-```
-
-Examples:
-
-```bash
-# Download all agents whose names begin with 'dev-' and end with '-v1'
-python aif_helper.py --download-all-agents --prefix dev- --suffix -v1
-
-# Upload all local JSON definitions adding a prefix
-python aif_helper.py --upload-all-agents --prefix staging-
-
-# Download a single agent
-python aif_helper.py --download-agent my_agent
-
-# Upload a single agent file
-python aif_helper.py --upload-agent my_agent
+--agents-dir DIR        Directory for agent JSON files (default: agents)
+--download-all-agents   Download all existing agents
+--download-agent NAME   Download a single agent by name
+--upload-all-agents     Create/update all agents from JSON files
+--upload-agent NAME     Create/update a single agent from JSON file
+--prefix TEXT           Optional prefix applied during download/upload
+--suffix TEXT           Optional suffix applied during download/upload
+--log-level LEVEL       Logging level (CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET)
 ```
 
 ## 📋 File Structure
@@ -138,21 +141,20 @@ aif_workflow_helpers/
 ├── requirements.txt
 ├── README.md
 └── aif_workflow_helpers/
-    ├── __init__.py               # Re-exports helper functions
+    ├── __init__.py               # Public exports (upload/download/logging)
     ├── upload_agent_helpers.py   # Upload + dependency logic
     ├── download_agent_helpers.py # Download + generalization logic
-    ├── logging_utils.py          # Shared logging setup
+    ├── logging_utils.py          # Shared logging configuration
     ├── name_validation.py        # Agent name validation
-    └── vscode_sdk_coversion_helpers.py
 ```
 
 ## ⚠️ Important Notes
 
-1. **Authentication**: Uses Azure DefaultAzureCredential with interactive fallback
-2. **Dependencies**: Automatically resolves agent dependencies using topological sort
-3. **File Safety**: Agent names are sanitized for safe filesystem use
-4. **Error Handling**: Comprehensive error handling with detailed logging
-5. **Performance**: Minimizes API calls via cached existing agent list during batch operations
+1. **Authentication**: Uses `DefaultAzureCredential` (interactive fallback enabled)
+2. **Dependency Ordering**: Creates/updates in safe order via topological sort
+3. **Name Safety**: Validation ensures only alphanumerics + hyphens (prefix/suffix applied consistently)
+4. **Logging**: Centralized configurable logger (`configure_logging`)
+5. **Efficiency**: Minimizes duplicate lookups by caching existing agents during batch operations
 
 ## 🔍 Troubleshooting
 
@@ -187,7 +189,7 @@ export PYTHONPATH=$(pwd)
 
 ## 🎉 Success Output
 
-When running successfully, you should see:
+Typical successful run output (truncated example):
 
 ```text
 🔌 Testing connection...

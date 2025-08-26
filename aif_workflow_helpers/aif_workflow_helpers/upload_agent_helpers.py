@@ -5,9 +5,7 @@ from glob import glob
 from collections import defaultdict
 from pathlib import Path
 from azure.ai.agents import AgentsClient, models
-from .logging_utils import logger, configure_logging  # re-exported for backward compatibility
-_configure_logging_ref = configure_logging
-
+from .logging_utils import logger
 
 def read_agent_file(file_path: str) -> dict | None:
     """Read a single agent JSON file.
