@@ -1,6 +1,8 @@
 
 import os
 import json
+from pathlib import Path 
+
 from azure.ai.agents import AgentsClient
 from azure.ai.agents.models import Agent
 
@@ -8,6 +10,16 @@ from .logging_utils import logger
 from .name_validation import validate_agent_name
 
 def trim_agent_name(agent_name: str, prefix: str = "", suffix: str = "") -> str:
+    """Remove provided prefix and suffix from an agent name if present.
+
+    Args:
+        agent_name: Original agent name.
+        prefix: Prefix to strip when found at the start.
+        suffix: Suffix to strip when found at the end.
+
+    Returns:
+        The normalized agent name without the given prefix/suffix.
+    """
     if prefix and agent_name.startswith(prefix):
         agent_name = agent_name[len(prefix):]
     if suffix and agent_name.endswith(suffix):
@@ -15,125 +27,159 @@ def trim_agent_name(agent_name: str, prefix: str = "", suffix: str = "") -> str:
     return agent_name
 
 def get_agent_name(agent_id: str, agent_client: AgentsClient) -> str | None:
-    """Get agent name by ID, return None if not found"""
+    """Retrieve an agent's name by its ID.
+
+    Args:
+        agent_id: Unique identifier of the agent.
+        agent_client: Client used to fetch the agent.
+
+    Returns:
+        The agent name if found; otherwise None.
+    """
+    name: str | None = None
     try:
         agent = agent_client.get_agent(agent_id)
-        return agent.name if agent else None
+        if agent:
+            name = agent.name
     except Exception as e:
         logger.warning(f"Error getting agent name for ID {agent_id}: {e}")
-        return None
+    return name
 
 def get_agent_by_name(agent_name: str, agent_client: AgentsClient) -> Agent | None:
-    """Get an agent by name from the system"""
+    """Fetch an agent object by its name.
+
+    Args:
+        agent_name: Name of the agent to retrieve.
+        agent_client: Client used to list and search agents.
+
+    Returns:
+        The matching Agent instance if found; otherwise None.
+    """
+    found: Agent | None = None
     try:
         agent_list = agent_client.list_agents()
         for agent in agent_list:
             if agent.name == agent_name:
-                return agent
-        return None
+                found = agent
+                break
     except Exception as e:
         logger.warning(f"Error getting agent by name '{agent_name}': {e}")
-        return None
+    return found
 
 def generalize_agent_dict(data: dict, agent_client: AgentsClient, prefix: str = "", suffix: str = "") -> dict:
-    """Remove 'id' and 'created_at' properties from a dictionary or nested structure"""
-    if isinstance(data, dict):        
-        # Special handling for connected_agent type
-        if data.get('type') == 'connected_agent':
-            # The ID is nested in the connected_agent object
-            connected_agent_data = data.get('connected_agent', {})
-            agent_id = connected_agent_data.get('id')
-            
-            # Get agent name for the connected agent
-            agent_name = None
-            if agent_id is not None:
-                agent_name = get_agent_name(agent_id, agent_client)
-            
-            # Create new dict without 'id' and 'created_at' keys and recursively process values
-            result = {}
-            for k, v in data.items():
-                if k not in ['id', 'created_at']:
-                    if k == 'connected_agent':
-                        # Process the connected_agent object and add id_name to it
-                        processed_connected_agent = generalize_agent_dict(v, agent_client, prefix, suffix)
-                        if agent_name:
-                            processed_connected_agent['name_from_id'] = trim_agent_name(agent_name, prefix, suffix)
-                        else:
-                            processed_connected_agent['name_from_id'] = "Unknown Agent"
-                        result[k] = processed_connected_agent
-                    else:
-                        result[k] = generalize_agent_dict(v, agent_client, prefix, suffix)
-            
-            return result
-        else:
-            # Create new dict without 'id' and 'created_at' keys and recursively process values
-            result = {}
-            for k, v in data.items():
-                if k == 'name':
-                    result[k] = trim_agent_name(v, prefix, suffix)
-                elif k not in ['id', 'created_at']:
-                    result[k] = generalize_agent_dict(v, agent_client, prefix, suffix)
-            
-            return result
-    elif isinstance(data, list):
-        # Process each item in the list
-        return [generalize_agent_dict(item, agent_client, prefix, suffix) for item in data]
-    else:
-        # Return primitive values as-is
-        return data
+    """Normalize an agent-derived structure for export.
 
-def download_agents(agent_client: AgentsClient, file_path: str | None = None, prefix: str = "", suffix: str = "") -> None:
-    """Download all agents and save them to JSON files.
+    Removes transient keys (``id``, ``created_at``), converts connected agent
+    IDs to a ``name_from_id`` field, and trims any provided prefix/suffix from
+    agent names recursively.
 
     Args:
-        agent_client: Azure AI Agents client
-        file_path: Optional directory path to save agent JSON files. Defaults to current working directory.
-    """
-    agent_list = agent_client.list_agents()
+        data: Arbitrary nested structure (dict/list/primitives) from an agent.
+        agent_client: Client used to resolve connected agent names.
+        prefix: Optional prefix to remove from name fields.
+        suffix: Optional suffix to remove from name fields.
 
+    Returns:
+        A new structure with IDs removed and names normalized.
+    """
+    result: dict | list | str | int | float | bool | None = None
+
+    if isinstance(data, dict):
+        if data.get('type') == 'connected_agent':
+            connected_agent_data = data.get('connected_agent', {})
+            agent_id = connected_agent_data.get('id')
+            agent_name = get_agent_name(agent_id, agent_client) if agent_id is not None else None
+
+            processed: dict = {}
+            for k, v in data.items():
+                if k in ['id', 'created_at']:
+                    continue
+                if k == 'connected_agent':
+                    nested = generalize_agent_dict(v, agent_client, prefix, suffix)
+                    if isinstance(nested, dict):
+                        nested['name_from_id'] = trim_agent_name(agent_name, prefix, suffix) if agent_name else "Unknown Agent"
+                    processed[k] = nested
+                else:
+                    processed[k] = generalize_agent_dict(v, agent_client, prefix, suffix)
+            result = processed
+        else:
+            processed: dict = {}
+            for k, v in data.items():
+                if k in ['id', 'created_at']:
+                    continue
+                if k == 'name':
+                    processed[k] = trim_agent_name(v, prefix, suffix)
+                else:
+                    processed[k] = generalize_agent_dict(v, agent_client, prefix, suffix)
+            result = processed
+    elif isinstance(data, list):
+        result = [generalize_agent_dict(item, agent_client, prefix, suffix) for item in data]
+    else:
+        result = data
+
+    return result
+
+def download_agents(agent_client: AgentsClient, file_path: str | None = None, prefix: str = "", suffix: str = "") -> bool:
+    """Download all (optionally filtered) agents to JSON files.
+
+    Agents are filtered by prefix and suffix (both must match if provided) and
+    each definition is normalized before being written.
+
+    Args:
+        agent_client: Client used to list agents.
+        file_path: Directory where files are saved (defaults to current dir).
+        prefix: Only include agents whose names start with this value.
+        suffix: Only include agents whose names end with this value.
+
+    Returns:
+        True if all selected agents were written successfully; False otherwise.
+    """
+    success = True
+    agent_list = agent_client.list_agents()
     base_dir = file_path or "."
-    # Create directory if custom path provided and doesn't exist
+
     if base_dir and base_dir != ".":
         try:
             os.makedirs(base_dir, exist_ok=True)
         except OSError as e:
             logger.error(f"Could not create directory '{base_dir}': {e}")
-            return
+            success = False
 
-    for agent in agent_list:
-        if agent.name.startswith(prefix) and agent.name.endswith(suffix):
+    if success:
+        for agent in agent_list:
+            if not (agent.name.startswith(prefix) and agent.name.endswith(suffix)):
+                continue
             agent_dict = agent.as_dict()
-
             clean_dict = generalize_agent_dict(agent_dict, agent_client, prefix, suffix)
-
-            # remove prefix from beginning and suffix from end of agent.name
             agent_name = agent.name[len(prefix):] if prefix else agent.name
             agent_name = agent_name[:-len(suffix)] if suffix else agent_name
-            filename = f"{agent_name}.json"
-            full_path = f"{base_dir}/{filename}"
+            full_path = Path(f"{base_dir}/{agent_name}.json")
             try:
                 with open(full_path, 'w') as f:
                     json.dump(clean_dict, f, indent=2)
-
+                logger.info(f"Saved agent '{agent.name}' to {full_path}")
+                logger.debug(json.dumps(clean_dict, indent=2))
             except Exception as e:
                 logger.error(f"Error saving agent '{agent.name}' to {full_path}: {e}")
-                return
+                success = False
+                break
 
-            logger.info(f"Saved agent '{agent.name}' to {full_path}")
-            logger.debug(json.dumps(clean_dict, indent=2))
+    return success
 
-def download_agent(agent_name: str, agent_client: AgentsClient, file_path: str | None = None, prefix: str = "", suffix: str = "") -> None:
-    """Download a specific agent by name and save it to a JSON file.
+def download_agent(agent_name: str, agent_client: AgentsClient, file_path: str | None = None, prefix: str = "", suffix: str = "") -> bool:
+    """Download a single agent definition to a JSON file.
 
     Args:
-        agent_name: Name of the agent to download
-        agent_client: Azure AI Agents client
-        file_path: Optional directory path to save the agent JSON file. Defaults to current working directory.
-        prefix: Optional prefix for the Agent name. Defaults to an empty string.
-        suffix: Optional suffix for the Agent name. Defaults to an empty string.
-    """
+        agent_name: Agent name excluding optional prefix/suffix.
+        agent_client: Client used to retrieve the agent.
+        file_path: Directory where the file is saved (defaults to current dir).
+        prefix: Prefix applied to the stored agent name in the service.
+        suffix: Suffix applied to the stored agent name in the service.
 
-    # add a check to make sure the prefix and suffix only contains letters and/or -
+    Returns:
+        True if the agent definition was saved successfully; False otherwise.
+    """
+    success = True
     full_agent_name = f"{prefix}{agent_name}{suffix}"
     validate_agent_name(full_agent_name)
     agent = get_agent_by_name(full_agent_name, agent_client)
@@ -144,25 +190,22 @@ def download_agent(agent_name: str, agent_client: AgentsClient, file_path: str |
             os.makedirs(base_dir, exist_ok=True)
         except OSError as e:
             logger.error(f"Could not create directory '{base_dir}': {e}")
-            return
+            success = False
 
-    if agent:
+    if success and agent:
         agent_dict = agent.as_dict()
         clean_dict = generalize_agent_dict(agent_dict, agent_client, prefix, suffix)
-
-        filename = f"{agent_name}.json"
-        full_path = f"{base_dir}/{filename}"
+        full_path = Path(f"{base_dir}/{agent_name}.json")
         try:
             with open(full_path, 'w') as f:
                 json.dump(clean_dict, f, indent=2)
-
+            logger.info(f"Saved agent '{agent.name}' to {full_path}")
+            logger.debug(json.dumps(clean_dict, indent=2))
         except Exception as e:
             logger.error(f"Error saving agent '{agent.name}' to {full_path}: {e}")
-            return
-
-        logger.info(f"Saved agent '{agent.name}' to {full_path}")
-        logger.debug(json.dumps(clean_dict, indent=2))
-    else:
+            success = False
+    elif success and not agent:
         logger.warning(f"Agent with name {full_agent_name} not found.")
+        success = False
 
-
+    return success
