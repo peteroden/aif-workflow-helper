@@ -13,28 +13,33 @@ def read_agent_file(file_path: str) -> dict | None:
     """Read a single agent JSON file.
 
     Args:
-        file_path: Path to the agent JSON file
+        file_path: Path to the agent JSON file.
+
     Returns:
-        Parsed dict or None if error
+        Parsed dictionary if successful; otherwise None on error.
     """
+    data: dict | None = None
     try:
         with open(file_path, 'r') as f:
-            data = json.load(f)
+            loaded = json.load(f)
             logger.info(f"Successfully read agent file: {file_path}")
-        return data
+            data = loaded
     except json.JSONDecodeError as e:
         logger.error(f"Invalid JSON in {file_path}: {e}")
     except FileNotFoundError:
         logger.error(f"Agent file not found: {file_path}")
     except Exception as e:
         logger.error(f"Unexpected error reading {file_path}: {e}")
-    return None
+    return data
 
 def read_agent_files(path: str = ".") -> dict:
-    """Read all agent JSON files in the specified directory
+    """Load all agent JSON files in a directory.
 
     Args:
-        path: Directory path to search for agent JSON files.
+        path: Directory path to search for agent JSON files (default current directory).
+
+    Returns:
+        Mapping of agent name to raw agent definition dictionaries.
     """
     agent_files = glob(f"{path}/*.json")
     agents_data = {}
@@ -45,7 +50,17 @@ def read_agent_files(path: str = ".") -> dict:
     return agents_data
 
 def extract_dependencies(agents_data: dict) -> defaultdict:
-    """Extract dependencies from connected agents"""
+    """Extract connected-agent dependencies.
+
+    Scans each agent's `tools` list for entries of type `connected_agent` and
+    records name-based dependencies.
+
+    Args:
+        agents_data: Mapping of agent name to its configuration dictionary.
+
+    Returns:
+        A defaultdict(set) mapping agent name to the set of dependency names.
+    """
     dependencies = defaultdict(set)
     
     for agent_name, agent_data in agents_data.items():
@@ -70,7 +85,17 @@ def extract_dependencies(agents_data: dict) -> defaultdict:
     return dependencies
 
 def dependency_sort(agents_data: dict) -> list:
-    """Perform sort to determine creation order based on dependencies"""
+    """Order agents so dependencies are created first.
+
+    Performs a topological-like sort; if cycles are detected, remaining agents
+    are appended in arbitrary order with a warning.
+
+    Args:
+        agents_data: Mapping of agent name to configuration.
+
+    Returns:
+        List of agent names in creation order.
+    """
     
     agents = set(agents_data.keys())
     dependencies = extract_dependencies(agents_data)
@@ -88,65 +113,59 @@ def dependency_sort(agents_data: dict) -> list:
             unsorted.remove(a)
     return sorted_order
 
-def create_or_update_agent(agent_data: dict, agent_client: AgentsClient, existing_agents: list[models.Agent] = None, prefix: str = "", suffix: str = "") -> models.Agent:
-    """Create or update an agent in the system
-    
+def create_or_update_agent(agent_data: dict, agent_client: AgentsClient, existing_agents: list[models.Agent] = None, prefix: str = "", suffix: str = "") -> models.Agent | None:
+    """Create or update a single agent definition.
+
+    Resolves any connected-agent references using the provided existing agent
+    list (fetching if necessary) and applies an optional prefix/suffix to the
+    agent's name for namespacing.
+
     Args:
-        agent_data: Dictionary containing agent configuration
-        agent_client: Azure AI Agents client
-        existing_agents: Optional list of existing agents (fetched if None)
-        prefix: Prefix to add to agent names
-        suffix: Suffix to add to agent names
+        agent_data: Agent configuration dictionary.
+        agent_client: Azure AI Agents client.
+        existing_agents: Optional pre-fetched list of agent objects.
+        prefix: Prefix applied to the agent name.
+        suffix: Suffix applied to the agent name.
+
+    Returns:
+        The created or updated agent instance, or None on failure.
     """
+    result: models.Agent | None = None
 
-    # Prepare agent data for creation (resolve connected agent references and any name changes)
     clean_data = agent_data.copy()
+    if prefix or suffix:
+        full_agent_name = prefix + agent_data['name'] + suffix
+        validate_agent_name(full_agent_name)
+        clean_data['name'] = full_agent_name
 
-    if prefix != "" or suffix != "":
-            full_agent_name = prefix + agent_data['name'] + suffix
-            validate_agent_name(full_agent_name)
-            clean_data['name'] = full_agent_name
-    
     if existing_agents is None:
         existing_agents = list(agent_client.list_agents())
         logger.info(f"Found {len(existing_agents)} existing agents in the system")
 
     try:
-        # Find existing agent by name
         existing_agent = None
-        
-        # Create a lookup dict for agent names to IDs
         agent_names_to_ids = {agent.name: agent.id for agent in existing_agents}
-        
         for agent in existing_agents:
             if agent.name == clean_data['name']:
                 existing_agent = agent
                 break
-        
-        # Resolve connected agent name_from_id fields back to actual IDs
+
         if 'tools' in clean_data:
             for tool in clean_data['tools']:
                 if tool.get('type') == 'connected_agent' and 'connected_agent' in tool:
                     connected_agent_data = tool['connected_agent']
-                    
-                    # If we have a name_from_id field, resolve it to actual ID
                     if 'name_from_id' in connected_agent_data:
                         agent_name_ref = prefix + connected_agent_data['name_from_id'] + suffix
-                        
-                        # Look up the actual agent ID
                         if agent_name_ref in agent_names_to_ids:
                             connected_agent_data['id'] = agent_names_to_ids[agent_name_ref]
                             logger.debug(f"Resolved '{agent_name_ref}' to ID: {agent_names_to_ids[agent_name_ref]}")
                         else:
                             logger.warning(f"Could not resolve agent name '{agent_name_ref}' to ID")
-                        
-                        # Remove our custom name_from_id field
                         del connected_agent_data['name_from_id']
-        
+
         if existing_agent:
             logger.info(f"Updating existing agent: {clean_data['name']}")
-            # Update existing agent
-            updated_agent = agent_client.update_agent(
+            result = agent_client.update_agent(
                 agent_id=existing_agent.id,
                 name=clean_data['name'],
                 description=clean_data.get('description'),
@@ -157,11 +176,9 @@ def create_or_update_agent(agent_data: dict, agent_client: AgentsClient, existin
                 top_p=clean_data.get('top_p', 1.0),
                 metadata=clean_data.get('metadata', {})
             )
-            return updated_agent
         else:
             logger.info(f"Creating new agent: {clean_data['name']}")
-            # Create new agent
-            new_agent = agent_client.create_agent(
+            result = agent_client.create_agent(
                 name=clean_data['name'],
                 description=clean_data.get('description'),
                 instructions=clean_data.get('instructions', ''),
@@ -171,20 +188,20 @@ def create_or_update_agent(agent_data: dict, agent_client: AgentsClient, existin
                 top_p=clean_data.get('top_p', 1.0),
                 metadata=clean_data.get('metadata', {})
             )
-            return new_agent
-            
-    except Exception as e:
+    except Exception as e:  # pragma: no cover (already logged via exception)
         logger.exception(f"Error creating/updating agent {clean_data['name']}: {e}")
-        return None
+        result = None
+
+    return result
 
 def create_or_update_agents(agents_data: dict, agent_client: AgentsClient, prefix: str="", suffix: str="") -> None:
-    """Create or update multiple agents in the system
-    
+    """Create or update multiple agents honoring dependencies.
+
     Args:
-        agents_data: Dictionary containing agent configurations
-        agent_client: Azure AI Agents client
-        prefix: Prefix to add to agent names
-        suffix: Suffix to add to agent names
+        agents_data: Mapping of agent name to configuration dictionaries.
+        agent_client: Azure AI Agents client.
+        prefix: Prefix applied to each agent name during creation/update.
+        suffix: Suffix applied to each agent name during creation/update.
     """
     logger.info("Sort agents to create in dependency order...")
     creation_ordered_agents = dependency_sort(agents_data)
@@ -210,13 +227,13 @@ def create_or_update_agents(agents_data: dict, agent_client: AgentsClient, prefi
 
 
 def create_or_update_agents_from_files(path: str, agent_client: AgentsClient, prefix: str="", suffix: str="") -> None:
-    """Create or update multiple agents from a JSON file.
+    """Load agent files from a directory and create/update them.
 
     Args:
-        file_path: Path to the JSON file containing agent configurations
-        agent_client: Azure AI Agents client
-        prefix: Prefix to add to agent names
-        suffix: Suffix to add to agent names
+        path: Directory containing `*.json` agent definition files.
+        agent_client: Azure AI Agents client.
+        prefix: Prefix applied to agent names.
+        suffix: Suffix applied to agent names.
     """
 
     agents_dir = Path(path)
@@ -240,6 +257,15 @@ def create_or_update_agents_from_files(path: str, agent_client: AgentsClient, pr
         raise ValueError(f"Error uploading agent files: {e}")
 
 def create_or_update_agent_from_file(agent_name: str, path: str, agent_client: AgentsClient, prefix: str="", suffix: str="") -> None:
+    """Create or update a single agent from a JSON file.
+
+    Args:
+        agent_name: Base name (without .json) of the agent definition file.
+        path: Directory containing the agent file.
+        agent_client: Azure AI Agents client.
+        prefix: Prefix applied to agent name.
+        suffix: Suffix applied to agent name.
+    """
     agent_dict = read_agent_file(Path(f"{path}/{agent_name}.json"))
     if agent_dict:
         create_or_update_agent(agent_data=agent_dict, agent_client=agent_client, prefix=prefix, suffix=suffix)
