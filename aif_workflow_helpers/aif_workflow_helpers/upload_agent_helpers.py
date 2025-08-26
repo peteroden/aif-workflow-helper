@@ -225,7 +225,7 @@ def create_or_update_agents_from_files(path: str, agent_client: AgentsClient, pr
         raise ValueError(f"ERROR: Agents directory not found: {agents_dir}")
 
     try:
-        print("Reading agent files...")
+        logger.info("Reading agent files...")
         agents_data = read_agent_files(agents_dir)
         logger.info(f"Found {len(agents_data)} agents")
         
@@ -240,6 +240,6 @@ def create_or_update_agents_from_files(path: str, agent_client: AgentsClient, pr
         raise ValueError(f"Error uploading agent files: {e}")
 
 def create_or_update_agent_from_file(agent_name: str, path: str, agent_client: AgentsClient, prefix: str="", suffix: str="") -> None:
-    agent_dict = read_agent_file(f"{path}/{agent_name}.json")
+    agent_dict = read_agent_file(Path(f"{path}/{agent_name}.json"))
     if agent_dict:
         create_or_update_agent(agent_data=agent_dict, agent_client=agent_client, prefix=prefix, suffix=suffix)

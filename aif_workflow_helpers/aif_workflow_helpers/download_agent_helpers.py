@@ -2,6 +2,7 @@
 import os
 import json
 from azure.ai.agents import AgentsClient
+from azure.ai.agents.models import Agent
 
 from .logging_utils import logger
 from .name_validation import validate_agent_name
@@ -22,7 +23,7 @@ def get_agent_name(agent_id: str, agent_client: AgentsClient) -> str | None:
         logger.warning(f"Error getting agent name for ID {agent_id}: {e}")
         return None
 
-def get_agent_by_name(agent_name: str, agent_client: AgentsClient):
+def get_agent_by_name(agent_name: str, agent_client: AgentsClient) -> Agent | None:
     """Get an agent by name from the system"""
     try:
         agent_list = agent_client.list_agents()
