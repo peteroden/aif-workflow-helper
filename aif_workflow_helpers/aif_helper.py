@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from __future__ import annotations
 import argparse
 import os
 import sys
@@ -10,12 +9,12 @@ from logging import getLevelNamesMapping
 
 from aif_workflow_helpers import (
     configure_logging,
+    logger,
     download_agent,
     download_agents,
     create_or_update_agents_from_files,
     create_or_update_agent_from_file
 )
-
 
 def process_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="AI Foundry Agent Helper CLI")
@@ -77,12 +76,12 @@ def get_agent_client() -> AgentsClient:
     # Basic environment validation
     tenant_id = os.getenv("AZURE_TENANT_ID")
     if not tenant_id:
-        print("ERROR: AZURE_TENANT_ID environment variable is required", file=sys.stderr)
+        logger.error("AZURE_TENANT_ID environment variable is required")
         sys.exit(1)
 
     endpoint = os.getenv("AIF_ENDPOINT")
     if not endpoint:
-        print("ERROR: AIF_ENDPOINT environment variable is required", file=sys.stderr)
+        logger.error("AIF_ENDPOINT environment variable is required")
         sys.exit(1)
 
     agent_client = AgentsClient(
@@ -100,34 +99,34 @@ def handle_download_agent_arg(args: argparse.Namespace, agent_client: AgentsClie
         agents_dir.mkdir(parents=True, exist_ok=True)
         try:
             agent_name = args.download_agent
-            print("Connecting...")
+            logger.info("Connecting...")
             agents = list(agent_client.list_agents())
-            print(f"Connected. Found {len(agents)} existing agents")
+            logger.info(f"Connected. Found {len(agents)} existing agents")
 
-            print(f"Downloading agent {agent_name}...")
+            logger.info(f"Downloading agent {agent_name}...")
             download_agent(agent_name=agent_name, agent_client=agent_client,file_path=agents_dir,prefix=args.prefix,suffix=args.suffix)
         except Exception as e:
-            print(f"Unhandled error in downloading agent: {e}")
+            logger.error(f"Unhandled error in downloading agent: {e}")
     else:
-        print("Agent name not provided")  
+        logger.info("Agent name not provided")
 
 def handle_download_all_agents_arg(args: argparse.Namespace, agent_client: AgentsClient) -> None:
         agents_dir = Path(args.agents_dir)
         agents_dir.mkdir(parents=True, exist_ok=True)
         try:
-            print("Connecting...")
+            logger.info("Connecting...")
             agents = list(agent_client.list_agents())
-            print(f"Connected. Found {len(agents)} existing agents")
+            logger.info(f"Connected. Found {len(agents)} existing agents")
 
-            print("Downloading agents...")
+            logger.info("Downloading agents...")
             download_agents(agent_client, file_path=agents_dir, prefix=args.prefix, suffix=args.suffix)
         except Exception as e:
-            print(f"Unhandled error in downloading agents: {e}")
+            logger.error(f"Unhandled error in downloading agents: {e}")
 
 def handle_upload_agent_arg(args: argparse.Namespace, agent_client: AgentsClient) -> None:
     agents_dir = Path(args.agents_dir)
     if not agents_dir.exists() or not agents_dir.is_dir():
-        print(f"ERROR: Agents directory not found: {agents_dir}", file=sys.stderr)
+        logger.error(f"Agents directory not found: {agents_dir}")
         sys.exit(1)
 
     agent_name = args.upload_agent
@@ -135,19 +134,19 @@ def handle_upload_agent_arg(args: argparse.Namespace, agent_client: AgentsClient
     try:
         create_or_update_agent_from_file(agent_name=agent_name, path=agents_dir, agent_client=agent_client, prefix=args.prefix, suffix=args.suffix)
     except Exception as e:
-        print(f"Error uploading agent {agent_name}: {e}")
+        logger.error(f"Error uploading agent {agent_name}: {e}")
 
 def handle_upload_all_agents_arg(args: argparse.Namespace, agent_client: AgentsClient) -> None:
     agents_dir = Path(args.agents_dir)
     if not agents_dir.exists() or not agents_dir.is_dir():
-        print(f"ERROR: Agents directory not found: {agents_dir}", file=sys.stderr)
+        logger.error(f"Agents directory not found: {agents_dir}")
         sys.exit(1)
 
     try:
         create_or_update_agents_from_files(path=agents_dir, agent_client=agent_client, prefix=args.prefix, suffix=args.suffix)
 
     except Exception as e:
-        print(f"Error uploading agent files: {e}")
+        logger.error(f"Error uploading agent files: {e}")
 
 def main():
     args = process_args()

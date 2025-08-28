@@ -11,11 +11,13 @@ from .download_agent_helpers import (
 )
 
 from .logging_utils import (
-    configure_logging
+    configure_logging,
+    logger
 )
 
 __all__ = [
     "configure_logging",
+    "logger",
     "download_agents",
     "download_agent",
     "create_or_update_agent",
