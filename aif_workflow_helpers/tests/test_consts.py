@@ -6,7 +6,7 @@ TEST_AGENT_DATA_GOOD_NO_DEPENDENCIES = {
 }
 
 TEST_AGENT_DATA_GOOD_SINGLE_DEPENDENCY = {
-    "agent-a": {"name": "agent-a", "tools": []},
+    "agent-a": {"name": "agent-a",   "instructions": "instructions", "tools": []},
     "agent-b": {"name": "agent-b", "tools": [
         {"type": "connected_agent", "connected_agent": {"name_from_id": "agent-a"}}
     ]},

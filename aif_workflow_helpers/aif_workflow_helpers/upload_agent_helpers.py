@@ -163,7 +163,7 @@ def create_or_update_agent(agent_data: dict, agent_client: AgentsClient, existin
         if existing_agent:
             logger.info(f"Updating existing agent: {clean_data['name']}")
             result = agent_client.update_agent(
-                agent_id=existing_agent.id,
+                id=existing_agent.id,
                 name=clean_data['name'],
                 description=clean_data.get('description'),
                 instructions=clean_data.get('instructions', ''),

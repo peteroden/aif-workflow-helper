@@ -1,4 +1,3 @@
-import logging
 import pytest
 
 from aif_workflow_helpers.upload_agent_helpers import (
@@ -52,14 +51,9 @@ def test_extract_dependencies_empty():
 
 
 def test_extract_dependencies_simple():
-    data = {
-        "a": {"name": "a", "tools": []},
-        "b": {"name": "b", "tools": [
-            {"type": "connected_agent", "connected_agent": {"name_from_id": "a"}}
-        ]}
-    }
-    deps = extract_dependencies(data)
-    assert deps == {"b": {"a"}}
+    deps = extract_dependencies(test_consts.TEST_AGENT_DATA_GOOD_SINGLE_DEPENDENCY)
+    assert deps == {'agent-b': {'agent-a'}}
+
 def test_sort_no_dependencies():
     order = dependency_sort(test_consts.TEST_AGENT_DATA_GOOD_MULTIPLE_NO_DEPENDENCIES)
     assert set(order) == {"agent-a", "agent-b", "agent-c"}
