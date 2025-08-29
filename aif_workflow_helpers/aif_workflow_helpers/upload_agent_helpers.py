@@ -103,9 +103,8 @@ def dependency_sort(agents_data: dict) -> list:
     while unsorted:
         ready = [a for a in unsorted if dependencies.get(a, set()).issubset(sorted_order)]
         if not ready:
-            logger.warning(f"Circular dependencies detected for: {sorted(unsorted)}")
-            sorted_order.extend(sorted(unsorted))
-            break
+            logger.error(f"Circular dependencies detected for: {sorted(unsorted)}")
+            raise ValueError(f"Circular dependencies detected for {sorted(unsorted)}")
         for a in ready:
             sorted_order.append(a)
             unsorted.remove(a)

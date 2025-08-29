@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock
 import pytest
 from aif_workflow_helpers.upload_agent_helpers import create_or_update_agent
+from . import test_consts
 
 def make_agent(name, id="id1"):
     agent = MagicMock()
@@ -18,24 +19,23 @@ class DummyClient:
 @pytest.mark.usefixtures("caplog")
 def test_create_new_agent():
     client = DummyClient([])
-    agent_data = {"name": "new-agent", "tools": []}
+    agent_data = test_consts.TEST_AGENT_DATA
     result = create_or_update_agent(agent_data, client)
     client.create_agent.assert_called_once()
     assert result.name == "created"
 
 @pytest.mark.usefixtures("caplog")
 def test_update_existing_agent():
-    existing = make_agent("existing-agent", "exid")
+    existing = make_agent("agent", "exid")
     client = DummyClient([existing])
-    agent_data = {"name": "existing-agent", "tools": []}
-    result = create_or_update_agent(agent_data, client)
+    result = create_or_update_agent(test_consts.TEST_AGENT_DATA, client)
     client.update_agent.assert_called_once()
     assert result.name == "updated"
 
 @pytest.mark.usefixtures("caplog")
 def test_resolve_name_from_id():
     # Should resolve name_from_id to id for connected_agent
-    existing = make_agent("dep-agent", "dep-id")
+    existing = make_agent("agent", "dep-id")
     client = DummyClient([existing])
     agent_data = {
         "name": "main-agent",
