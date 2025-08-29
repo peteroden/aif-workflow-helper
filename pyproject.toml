@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aif_workflow_helpers"
+version = "0.1.0"
+description = "Azure AI Foundry workflow helpers for agent management"
+authors = [
+  { name = "Unknown", email = "pete.roden@microsoft.com" }
+]
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["azure", "ai", "agents", "workflow", "automation"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+]
+
+# Core runtime dependencies
+dependencies = [
+  "azure-ai-projects",
+  "azure-ai-agents",
+  "azure-identity",
+  "pyyaml",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.0.0",
+  "pytest-cov>=4.0.0",
+  "pytest-mock>=3.10.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/peteroden/AIFoundry_CICD"
+Source = "https://github.com/peteroden/AIFoundry_CICD"
+
+# Optional console script entry point (uncomment to enable)
+# [project.scripts]
+# aif-agents = "aif_workflow_helpers.aif_helper:main"

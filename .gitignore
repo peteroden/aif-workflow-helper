@@ -4,4 +4,12 @@
 # Generated PR from Copilot
 pr.md
 pr-reference.xml
+
 .copilot-tracking/
+
+# Python
+__pycache__/
+.pytest_cache/
+.coverage
+htmlcov/
+venv/
