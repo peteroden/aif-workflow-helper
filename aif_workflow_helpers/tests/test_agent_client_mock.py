@@ -13,7 +13,6 @@ Agent objects expose attributes: id, name, tools (list) and any extra kwargs.
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional
-from aif_workflow_helpers.logging_utils import logger
 
 @dataclass
 class MockAgent:
@@ -104,17 +103,19 @@ class AgentsClientMock:
         agent = MockAgent(id=agent_id, name=name, description=description, instructions=instructions, model=model, temperature=temperature, top_p=top_p, metadata=metadata, tools=[t.copy() for t in tools], _extra=extra)
         return self._register(agent)
 
-    def update_agent(self, **kwargs) -> MockAgent:
+    def update_agent(self, agent_id: str, body=None, **kwargs) -> MockAgent:
         """
         Update existing agent.
         """
-        agent_id = kwargs.get("id")
-
         target: Optional[MockAgent] = None
         if agent_id:
             target = self._agents_by_id.get(agent_id)
         else:
             raise ValueError("update_agent target not found (need existing id)")
+
+        # If body is provided, merge its contents with kwargs
+        if body and isinstance(body, dict):
+            kwargs.update(body)
 
         # Update name (and index) if changed
         new_name = kwargs.get("name")
@@ -125,12 +126,12 @@ class AgentsClientMock:
             del self._name_index[target.name]
             target.name = new_name
             self._name_index[target.name] = target.id
-        target.description = kwargs.get("description", None)
-        target.instructions = kwargs.get("instructions", "")
-        target.model = kwargs.get("model", "gpt-4")
-        target.temperature = kwargs.get("temperature", 1.0)
-        target.top_p = kwargs.get("top_p", 1.0)
-        target.metadata = kwargs.get("metadata", {})
+        target.description = kwargs.get("description", target.description)
+        target.instructions = kwargs.get("instructions", target.instructions)
+        target.model = kwargs.get("model", target.model)
+        target.temperature = kwargs.get("temperature", target.temperature)
+        target.top_p = kwargs.get("top_p", target.top_p)
+        target.metadata = kwargs.get("metadata", target.metadata)
 
         if "tools" in kwargs and kwargs["tools"] is not None:
             target.tools = [t.copy() for t in kwargs["tools"]]

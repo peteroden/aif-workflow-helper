@@ -1,13 +1,47 @@
-
 import os
 import json
 from pathlib import Path 
+import yaml
+import frontmatter
 
 from azure.ai.agents import AgentsClient
 from azure.ai.agents.models import Agent
 
 from .logging_utils import logger
 from .name_validation import validate_agent_name
+from .format_constants import get_file_extension
+
+def save_agent_file(agent_dict: dict, file_path: Path, format: str = "json") -> bool:
+    """Save agent data to file in the specified format.
+    
+    Args:
+        agent_dict: Agent data dictionary
+        file_path: Path where to save the file
+        format: Format to save in (json, yaml, md)
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        with open(file_path, 'w') as f:
+            if format == "json":
+                json.dump(agent_dict, f, indent=2)
+            elif format == "yaml":
+                yaml.dump(agent_dict, f, default_flow_style=False, allow_unicode=True)
+            elif format == "md":
+                # For markdown, instructions become content and rest goes to frontmatter
+                metadata = agent_dict.copy()
+                content = metadata.pop("instructions", "")
+                post = frontmatter.Post(content, **metadata)
+                # Use dumps() instead of dump() to get a string
+                f.write(frontmatter.dumps(post))
+            else:
+                logger.error(f"Unsupported format: {format}")
+                return False
+        return True
+    except Exception as e:
+        logger.error(f"Error saving file {file_path}: {e}")
+        return False
 
 def trim_agent_name(agent_name: str, prefix: str = "", suffix: str = "") -> str:
     """Remove provided prefix and suffix from an agent name if present.
@@ -119,8 +153,8 @@ def generalize_agent_dict(data: dict, agent_client: AgentsClient, prefix: str = 
 
     return result
 
-def download_agents(agent_client: AgentsClient, file_path: str | None = None, prefix: str = "", suffix: str = "") -> bool:
-    """Download all (optionally filtered) agents to JSON files.
+def download_agents(agent_client: AgentsClient, file_path: str | None = None, prefix: str = "", suffix: str = "", format: str = "json") -> bool:
+    """Download all (optionally filtered) agents to files.
 
     Agents are filtered by prefix and suffix (both must match if provided) and
     each definition is normalized before being written.
@@ -130,6 +164,7 @@ def download_agents(agent_client: AgentsClient, file_path: str | None = None, pr
         file_path: Directory where files are saved (defaults to current dir).
         prefix: Only include agents whose names start with this value.
         suffix: Only include agents whose names end with this value.
+        format: Output format (json, yaml, md).
 
     Returns:
         True if all selected agents were written successfully; False otherwise.
@@ -146,6 +181,7 @@ def download_agents(agent_client: AgentsClient, file_path: str | None = None, pr
             success = False
 
     if success:
+        file_extension = get_file_extension(format)
         for agent in agent_list:
             if not (agent.name.startswith(prefix) and agent.name.endswith(suffix)):
                 continue
@@ -153,21 +189,19 @@ def download_agents(agent_client: AgentsClient, file_path: str | None = None, pr
             clean_dict = generalize_agent_dict(agent_dict, agent_client, prefix, suffix)
             agent_name = agent.name[len(prefix):] if prefix else agent.name
             agent_name = agent_name[:-len(suffix)] if suffix else agent_name
-            full_path = Path(f"{base_dir}/{agent_name}.json")
-            try:
-                with open(full_path, 'w') as f:
-                    json.dump(clean_dict, f, indent=2)
+            full_path = Path(f"{base_dir}/{agent_name}{file_extension}")
+            
+            if save_agent_file(clean_dict, full_path, format):
                 logger.info(f"Saved agent '{agent.name}' to {full_path}")
                 logger.debug(json.dumps(clean_dict, indent=2))
-            except Exception as e:
-                logger.error(f"Error saving agent '{agent.name}' to {full_path}: {e}")
+            else:
                 success = False
                 break
 
     return success
 
-def download_agent(agent_name: str, agent_client: AgentsClient, file_path: str | None = None, prefix: str = "", suffix: str = "") -> bool:
-    """Download a single agent definition to a JSON file.
+def download_agent(agent_name: str, agent_client: AgentsClient, file_path: str | None = None, prefix: str = "", suffix: str = "", format: str = "json") -> bool:
+    """Download a single agent definition to a file.
 
     Args:
         agent_name: Agent name excluding optional prefix/suffix.
@@ -175,6 +209,7 @@ def download_agent(agent_name: str, agent_client: AgentsClient, file_path: str |
         file_path: Directory where the file is saved (defaults to current dir).
         prefix: Prefix applied to the stored agent name in the service.
         suffix: Suffix applied to the stored agent name in the service.
+        format: Output format (json, yaml, md).
 
     Returns:
         True if the agent definition was saved successfully; False otherwise.
@@ -195,14 +230,13 @@ def download_agent(agent_name: str, agent_client: AgentsClient, file_path: str |
     if success and agent:
         agent_dict = agent.as_dict()
         clean_dict = generalize_agent_dict(agent_dict, agent_client, prefix, suffix)
-        full_path = Path(f"{base_dir}/{agent_name}.json")
-        try:
-            with open(full_path, 'w') as f:
-                json.dump(clean_dict, f, indent=2)
+        file_extension = get_file_extension(format)
+        full_path = Path(f"{base_dir}/{agent_name}{file_extension}")
+        
+        if save_agent_file(clean_dict, full_path, format):
             logger.info(f"Saved agent '{agent.name}' to {full_path}")
             logger.debug(json.dumps(clean_dict, indent=2))
-        except Exception as e:
-            logger.error(f"Error saving agent '{agent.name}' to {full_path}: {e}")
+        else:
             success = False
     elif success and not agent:
         logger.warning(f"Agent with name {full_agent_name} not found.")

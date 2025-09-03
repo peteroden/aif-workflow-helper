@@ -15,6 +15,7 @@ from aif_workflow_helpers import (
     create_or_update_agents_from_files,
     create_or_update_agent_from_file
 )
+from aif_workflow_helpers.format_constants import SUPPORTED_FORMATS
 
 def process_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="AI Foundry Agent Helper CLI")
@@ -52,6 +53,12 @@ def process_args() -> argparse.Namespace:
         "--suffix",
         default="",
         help="Add a suffix to the Agent name when uploading or downloading",
+    )
+    parser.add_argument(
+        "--format",
+        default="json",
+        choices=SUPPORTED_FORMATS,
+        help="File format for agent definitions (default: json)",
     )
     parser.add_argument(
         "--log-level",
@@ -104,7 +111,7 @@ def handle_download_agent_arg(args: argparse.Namespace, agent_client: AgentsClie
             logger.info(f"Connected. Found {len(agents)} existing agents")
 
             logger.info(f"Downloading agent {agent_name}...")
-            download_agent(agent_name=agent_name, agent_client=agent_client,file_path=agents_dir,prefix=args.prefix,suffix=args.suffix)
+            download_agent(agent_name=agent_name, agent_client=agent_client,file_path=agents_dir,prefix=args.prefix,suffix=args.suffix,format=args.format)
         except Exception as e:
             logger.error(f"Unhandled error in downloading agent: {e}")
     else:
@@ -119,7 +126,7 @@ def handle_download_all_agents_arg(args: argparse.Namespace, agent_client: Agent
             logger.info(f"Connected. Found {len(agents)} existing agents")
 
             logger.info("Downloading agents...")
-            download_agents(agent_client, file_path=agents_dir, prefix=args.prefix, suffix=args.suffix)
+            download_agents(agent_client, file_path=agents_dir, prefix=args.prefix, suffix=args.suffix, format=args.format)
         except Exception as e:
             logger.error(f"Unhandled error in downloading agents: {e}")
 
@@ -132,7 +139,7 @@ def handle_upload_agent_arg(args: argparse.Namespace, agent_client: AgentsClient
     agent_name = args.upload_agent
 
     try:
-        create_or_update_agent_from_file(agent_name=agent_name, path=agents_dir, agent_client=agent_client, prefix=args.prefix, suffix=args.suffix)
+        create_or_update_agent_from_file(agent_name=agent_name, path=agents_dir, agent_client=agent_client, prefix=args.prefix, suffix=args.suffix, format=args.format)
     except Exception as e:
         logger.error(f"Error uploading agent {agent_name}: {e}")
 
@@ -143,7 +150,7 @@ def handle_upload_all_agents_arg(args: argparse.Namespace, agent_client: AgentsC
         sys.exit(1)
 
     try:
-        create_or_update_agents_from_files(path=agents_dir, agent_client=agent_client, prefix=args.prefix, suffix=args.suffix)
+        create_or_update_agents_from_files(path=agents_dir, agent_client=agent_client, prefix=args.prefix, suffix=args.suffix, format=args.format)
 
     except Exception as e:
         logger.error(f"Error uploading agent files: {e}")
