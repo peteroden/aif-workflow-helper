@@ -96,9 +96,9 @@ def get_agent_client() -> AgentsClient:
         logger.error("AZURE_TENANT_ID environment variable is required")
         sys.exit(1)
 
-    endpoint = os.getenv("AIF_ENDPOINT")
+    endpoint = os.getenv("PROJECT_ENDPOINT")
     if not endpoint:
-        logger.error("AIF_ENDPOINT environment variable is required")
+        logger.error("PROJECT_ENDPOINT environment variable is required")
         sys.exit(1)
 
     agent_client = AgentsClient(

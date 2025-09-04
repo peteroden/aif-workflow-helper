@@ -182,4 +182,4 @@ def agents_data_with_dependencies():
 def mock_environment_variables(monkeypatch):
     """Mock environment variables for testing."""
     monkeypatch.setenv("AZURE_TENANT_ID", "test-tenant-id")
-    monkeypatch.setenv("AIF_ENDPOINT", "https://test-endpoint.services.ai.azure.com/api/projects/test-project")
+    monkeypatch.setenv("PROJECT_ENDPOINT", "https://test-endpoint.services.ai.azure.com/api/projects/test-project")

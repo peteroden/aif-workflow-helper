@@ -8,14 +8,14 @@ Utilities for exporting (downloading) and importing (creating/updating) Azure AI
 
 ```bash
 export AZURE_TENANT_ID='your-tenant-id-here'
-export AIF_ENDPOINT='your-ai-foundry-endpoint-here'
+export PROJECT_ENDPOINT='your-ai-foundry-endpoint-here'
 ```
 
 **Example:**
 
 ```bash
 export AZURE_TENANT_ID='16b3c013-d300-468d-ac64-7eda0820b6d3'
-export AIF_ENDPOINT='https://peroden-2927-resource.services.ai.azure.com/api/projects/peroden-2927'
+export PROJECT_ENDPOINT='https://peroden-2927-resource.services.ai.azure.com/api/projects/peroden-2927'
 ```
 
 ### 2. Install Dependencies
@@ -241,7 +241,7 @@ export PYTHONPATH=/workspaces/AIFoundry_CICD/aif_workflow_helpers
 ```bash
 # Make sure environment variables are set
 echo $AZURE_TENANT_ID
-echo $AIF_ENDPOINT
+echo $PROJECT_ENDPOINT
 
 # Try interactive login
 az login --tenant $AZURE_TENANT_ID
