@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from azure.ai.agents import AgentsClient
 from azure.identity import DefaultAzureCredential
-from logging import getLevelNamesMapping
+import logging
 
 from aif_workflow_helpers import (
     configure_logging,
@@ -73,8 +73,18 @@ def process_args() -> argparse.Namespace:
 def setup_logging(log_level_name: str) -> None:
     # Initialize logging once
     try:
-        log_levels = getLevelNamesMapping()
-        level = log_levels.get(log_level_name.upper())
+        # Python 3.11+ has getLevelNamesMapping(), earlier versions need getLevelName()
+        if sys.version_info >= (3, 11):
+            from logging import getLevelNamesMapping
+            log_levels = getLevelNamesMapping()
+            level = log_levels.get(log_level_name.upper())
+        else:
+            # For Python < 3.11, use getLevelName() which works in reverse
+            level = logging.getLevelName(log_level_name.upper())
+            # getLevelName returns the string if level is unknown, so check for int
+            if not isinstance(level, int):
+                level = None
+        
         configure_logging(level=level, propagate=True)
     except Exception:  # pragma: no cover
         configure_logging()
