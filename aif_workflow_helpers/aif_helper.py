@@ -66,6 +66,16 @@ def process_args() -> argparse.Namespace:
         choices=["CRITICAL","ERROR","WARNING","INFO","DEBUG","NOTSET"],
         help="Logging level for helper operations (default: INFO)",
     )
+    parser.add_argument(
+        "--azure-tenant-id",
+        default="",
+        help="Azure tenant ID (overrides AZURE_TENANT_ID environment variable)",
+    )
+    parser.add_argument(
+        "--project-endpoint",
+        default="",
+        help="AI Foundry project endpoint URL (overrides PROJECT_ENDPOINT environment variable)",
+    )
 
     args = parser.parse_args()
     return args
@@ -89,16 +99,16 @@ def setup_logging(log_level_name: str) -> None:
     except Exception:  # pragma: no cover
         configure_logging()
 
-def get_agent_client() -> AgentsClient:
-    # Basic environment validation
-    tenant_id = os.getenv("AZURE_TENANT_ID")
+def get_agent_client(args: argparse.Namespace) -> AgentsClient:
+    # Use CLI parameters if provided, otherwise fall back to environment variables
+    tenant_id = args.azure_tenant_id if args.azure_tenant_id else os.getenv("AZURE_TENANT_ID")
     if not tenant_id:
-        logger.error("AZURE_TENANT_ID environment variable is required")
+        logger.error("Azure tenant ID is required. Provide it via --azure-tenant-id or AZURE_TENANT_ID environment variable")
         sys.exit(1)
 
-    endpoint = os.getenv("AIF_ENDPOINT")
+    endpoint = args.project_endpoint if args.project_endpoint else os.getenv("PROJECT_ENDPOINT")
     if not endpoint:
-        logger.error("AIF_ENDPOINT environment variable is required")
+        logger.error("Project endpoint is required. Provide it via --project-endpoint or PROJECT_ENDPOINT environment variable")
         sys.exit(1)
 
     agent_client = AgentsClient(
@@ -171,7 +181,7 @@ def main():
     setup_logging(log_level_name=args.log_level)
 
     if args.download_all_agents or args.upload_all_agents or args.download_agent or args.upload_agent:
-        agent_client = get_agent_client()
+        agent_client = get_agent_client(args)
 
     if args.download_agent:
         handle_download_agent_arg(args=args, agent_client=agent_client)

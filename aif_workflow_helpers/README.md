@@ -8,15 +8,17 @@ Utilities for exporting (downloading) and importing (creating/updating) Azure AI
 
 ```bash
 export AZURE_TENANT_ID='your-tenant-id-here'
-export AIF_ENDPOINT='your-ai-foundry-endpoint-here'
+export PROJECT_ENDPOINT='your-ai-foundry-endpoint-here'
 ```
 
 **Example:**
 
 ```bash
 export AZURE_TENANT_ID='16b3c013-d300-468d-ac64-7eda0820b6d3'
-export AIF_ENDPOINT='https://peroden-2927-resource.services.ai.azure.com/api/projects/peroden-2927'
+export PROJECT_ENDPOINT='https://peroden-2927-resource.services.ai.azure.com/api/projects/peroden-2927'
 ```
+
+> **Note:** You can also provide these values via CLI parameters (`--azure-tenant-id` and `--project-endpoint`) which will take precedence over environment variables.
 
 ### 2. Install Dependencies
 
@@ -60,6 +62,15 @@ python aif_helper.py --upload-agent my_agent --format md
 
 # Change log level
 python aif_helper.py --download-all-agents --log-level DEBUG
+
+# Override environment variables with CLI parameters
+python aif_helper.py --download-all-agents \
+  --azure-tenant-id "your-tenant-id" \
+  --project-endpoint "https://your-endpoint.services.ai.azure.com/api/projects/your-project"
+
+# Mix CLI parameters with environment variables (CLI takes precedence)
+export AZURE_TENANT_ID="env-tenant-id"
+python aif_helper.py --download-all-agents --azure-tenant-id "cli-tenant-id"  # Uses CLI value
 ```
 
 ### 4. Direct Library Usage
@@ -133,16 +144,23 @@ create_or_update_agents_from_files(path="./agents", agent_client=client, prefix=
 `aif_helper.py` arguments:
 
 ```text
---agents-dir DIR        Directory for agent definition files (default: agents)
---download-all-agents   Download all existing agents
---download-agent NAME   Download a single agent by name
---upload-all-agents     Create/update all agents from definition files
---upload-agent NAME     Create/update a single agent from definition file
---prefix TEXT           Optional prefix applied during download/upload
---suffix TEXT           Optional suffix applied during download/upload
---format FORMAT         File format: json, yaml, or md (default: json)
---log-level LEVEL       Logging level (CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET)
+--agents-dir DIR                Directory for agent definition files (default: agents)
+--download-all-agents           Download all existing agents
+--download-agent NAME           Download a single agent by name
+--upload-all-agents             Create/update all agents from definition files
+--upload-agent NAME             Create/update a single agent from definition file
+--prefix TEXT                   Optional prefix applied during download/upload
+--suffix TEXT                   Optional suffix applied during download/upload
+--format FORMAT                 File format: json, yaml, or md (default: json)
+--log-level LEVEL               Logging level (CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET)
+--azure-tenant-id TENANT_ID     Azure tenant ID (overrides AZURE_TENANT_ID environment variable)
+--project-endpoint ENDPOINT     AI Foundry project endpoint URL (overrides PROJECT_ENDPOINT environment variable)
 ```
+
+### Authentication Priority
+
+1. **CLI Parameters** (highest priority): `--azure-tenant-id` and `--project-endpoint`
+2. **Environment Variables** (fallback): `AZURE_TENANT_ID` and `PROJECT_ENDPOINT`
 
 ## 📄 Supported File Formats
 
@@ -239,9 +257,14 @@ export PYTHONPATH=/workspaces/AIFoundry_CICD/aif_workflow_helpers
 ### Authentication Errors
 
 ```bash
-# Make sure environment variables are set
+# Check environment variables
 echo $AZURE_TENANT_ID
-echo $AIF_ENDPOINT
+echo $PROJECT_ENDPOINT
+
+# Or use CLI parameters (recommended for CI/CD or when environment variables conflict)
+python aif_helper.py --download-all-agents \
+  --azure-tenant-id "your-tenant-id" \
+  --project-endpoint "your-endpoint"
 
 # Try interactive login
 az login --tenant $AZURE_TENANT_ID
