@@ -1,5 +1,5 @@
 from unittest.mock import MagicMock
-from src.core.download import generalize_agent_dict
+from aif_workflow_helper.core.download import generalize_agent_dict
 
 def make_agent(name):
     agent = MagicMock()
