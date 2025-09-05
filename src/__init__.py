@@ -3,6 +3,7 @@
 # Core functionality
 from src.core.upload import (
     create_or_update_agent,
+    create_or_update_agents,
     create_or_update_agents_from_files,
     create_or_update_agent_from_file,
 )
@@ -31,10 +32,5 @@ __all__ = [
     "create_or_update_agent_from_file",
     "create_or_update_agents_from_files",
     "SUPPORTED_FORMATS",
-    "EXTENSION_MAP", 
-    "GLOB_PATTERN_MAP",
     "get_file_extension",
-    "get_glob_pattern",
-    "get_alternative_extensions",
-    "is_supported_format"
 ]
