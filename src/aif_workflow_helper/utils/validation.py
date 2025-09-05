@@ -1,7 +1,7 @@
 """Name validation utilities for agent names."""
 
 import re
-from src.utils.logging import logger
+from aif_workflow_helper.utils.logging import logger
 
 __all__ = ["validate_agent_name"]
 

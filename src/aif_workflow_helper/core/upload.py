@@ -6,9 +6,9 @@ from glob import glob
 from collections import defaultdict
 from pathlib import Path
 from azure.ai.agents import AgentsClient, models
-from src.utils.validation import validate_agent_name
-from src.core.formats import get_glob_pattern, get_file_extension, get_alternative_extensions
-from src.utils.logging import logger
+from aif_workflow_helper.utils.validation import validate_agent_name
+from aif_workflow_helper.core.formats import get_glob_pattern, get_file_extension, get_alternative_extensions
+from aif_workflow_helper.utils.logging import logger
 
 def read_agent_file(file_path: str) -> dict | None:
     """Read a single agent file in any supported format.

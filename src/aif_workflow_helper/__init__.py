@@ -1,21 +1,21 @@
 """Azure AI Foundry Agent Helper - Public API."""
 
 # Core functionality
-from src.core.upload import (
+from aif_workflow_helper.core.upload import (
     create_or_update_agent,
     create_or_update_agents,
     create_or_update_agents_from_files,
     create_or_update_agent_from_file,
 )
-from src.core.download import (
+from aif_workflow_helper.core.download import (
     download_agent,
     download_agents,
 )
-from src.utils.logging import (
+from aif_workflow_helper.utils.logging import (
     configure_logging,
     logger,
 )
-from src.core.formats import (
+from aif_workflow_helper.core.formats import (
     SUPPORTED_FORMATS,
     get_file_extension,
 )
