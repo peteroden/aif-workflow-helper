@@ -1,29 +1,26 @@
-from .upload_agent_helpers import (
+"""Azure AI Foundry Agent Helper - Public API."""
+
+# Core functionality
+from src.core.upload import (
     create_or_update_agent,
     create_or_update_agents,
-    create_or_update_agent_from_file,
     create_or_update_agents_from_files,
+    create_or_update_agent_from_file,
 )
-
-from .download_agent_helpers import (
-    download_agents,
+from src.core.download import (
     download_agent,
+    download_agents,
 )
-
-from .logging_utils import (
+from src.utils.logging import (
     configure_logging,
-    logger
+    logger,
+)
+from src.core.formats import (
+    SUPPORTED_FORMATS,
+    get_file_extension,
 )
 
-from .format_constants import (
-    SUPPORTED_FORMATS,
-    EXTENSION_MAP,
-    GLOB_PATTERN_MAP,
-    get_file_extension,
-    get_glob_pattern,
-    get_alternative_extensions,
-    is_supported_format
-)
+__version__ = "0.1.0"
 
 __all__ = [
     "configure_logging",
@@ -35,10 +32,5 @@ __all__ = [
     "create_or_update_agent_from_file",
     "create_or_update_agents_from_files",
     "SUPPORTED_FORMATS",
-    "EXTENSION_MAP", 
-    "GLOB_PATTERN_MAP",
     "get_file_extension",
-    "get_glob_pattern",
-    "get_alternative_extensions",
-    "is_supported_format"
 ]

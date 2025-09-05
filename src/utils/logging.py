@@ -1,3 +1,5 @@
+"""Logging utilities for aif_workflow_helpers package."""
+
 import logging
 
 LOGGER_NAME = "aif_workflow_helpers"

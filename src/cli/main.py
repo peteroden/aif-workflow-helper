@@ -1,4 +1,5 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
+
 import argparse
 import os
 import sys
@@ -7,15 +8,11 @@ from azure.ai.agents import AgentsClient
 from azure.identity import DefaultAzureCredential
 import logging
 
-from aif_workflow_helpers import (
-    configure_logging,
-    logger,
-    download_agent,
-    download_agents,
-    create_or_update_agents_from_files,
-    create_or_update_agent_from_file
-)
-from aif_workflow_helpers.format_constants import SUPPORTED_FORMATS
+# Direct imports from the flat structure modules
+from src.core.upload import create_or_update_agents_from_files, create_or_update_agent_from_file
+from src.core.download import download_agent, download_agents
+from src.core.formats import SUPPORTED_FORMATS
+from src.utils.logging import configure_logging, logger
 
 def process_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="AI Foundry Agent Helper CLI")

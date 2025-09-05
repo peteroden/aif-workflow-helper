@@ -1,6 +1,5 @@
-import pytest
 from unittest.mock import MagicMock
-from aif_workflow_helpers.upload_agent_helpers import create_or_update_agent
+from src.core.upload import create_or_update_agent
 from . import test_consts
 from .test_agent_client_mock import AgentsClientMock
 
