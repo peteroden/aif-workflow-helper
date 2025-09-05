@@ -1,8 +1,9 @@
 name: Release
 
 on:
-  push:
-    branches: [ main ]
+  # Temporarily disabled auto-trigger to prevent accidental releases
+  # push:
+  #   branches: [ main ]
   workflow_dispatch:
     inputs:
       version_bump:
