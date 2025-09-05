@@ -1,7 +1,7 @@
 import io
 import json
 from unittest.mock import MagicMock, patch
-from aif_workflow_helpers.download_agent_helpers import download_agent
+from src.core.download import download_agent
 
 def make_agent(name, as_dict=None):
     agent = MagicMock()

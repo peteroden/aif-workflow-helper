@@ -7,9 +7,9 @@ import frontmatter
 from azure.ai.agents import AgentsClient
 from azure.ai.agents.models import Agent
 
-from .logging_utils import logger
-from .name_validation import validate_agent_name
-from .format_constants import get_file_extension
+from utils.logging import logger
+from utils.validation import validate_agent_name
+from core.formats import get_file_extension
 
 def save_agent_file(agent_dict: dict, file_path: Path, format: str = "json") -> bool:
     """Save agent data to file in the specified format.
@@ -183,18 +183,35 @@ def download_agents(agent_client: AgentsClient, file_path: str | None = None, pr
     if success:
         file_extension = get_file_extension(format)
         for agent in agent_list:
-            if not (agent.name.startswith(prefix) and agent.name.endswith(suffix)):
-                continue
-            agent_dict = agent.as_dict()
-            clean_dict = generalize_agent_dict(agent_dict, agent_client, prefix, suffix)
-            agent_name = agent.name[len(prefix):] if prefix else agent.name
-            agent_name = agent_name[:-len(suffix)] if suffix else agent_name
-            full_path = Path(f"{base_dir}/{agent_name}{file_extension}")
-            
-            if save_agent_file(clean_dict, full_path, format):
-                logger.info(f"Saved agent '{agent.name}' to {full_path}")
-                logger.debug(json.dumps(clean_dict, indent=2))
-            else:
+            try:
+                logger.debug(f"Processing agent: {agent.name}")
+                if not (agent.name.startswith(prefix) and agent.name.endswith(suffix)):
+                    logger.debug(f"Skipping agent '{agent.name}' - doesn't match prefix/suffix filter")
+                    continue
+                
+                logger.debug(f"Converting agent '{agent.name}' to dict...")
+                agent_dict = agent.as_dict()
+                logger.debug(f"Agent dict keys: {list(agent_dict.keys()) if agent_dict else 'None'}")
+                
+                logger.debug(f"Generalizing agent dict for '{agent.name}'...")
+                clean_dict = generalize_agent_dict(agent_dict, agent_client, prefix, suffix)
+                
+                agent_name = agent.name[len(prefix):] if prefix else agent.name
+                agent_name = agent_name[:-len(suffix)] if suffix else agent_name
+                full_path = Path(f"{base_dir}/{agent_name}{file_extension}")
+                
+                if save_agent_file(clean_dict, full_path, format):
+                    logger.info(f"Saved agent '{agent.name}' to {full_path}")
+                    # Only try to serialize for debug if it's safe
+                    try:
+                        logger.debug(json.dumps(clean_dict, indent=2))
+                    except (TypeError, ValueError) as json_error:
+                        logger.debug(f"Could not serialize clean_dict for debug: {json_error}")
+                else:
+                    success = False
+                    break
+            except Exception as e:
+                logger.error(f"Error processing agent '{agent.name}': {e}")
                 success = False
                 break
 

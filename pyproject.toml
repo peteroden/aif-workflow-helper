@@ -2,6 +2,9 @@
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [project]
 name = "aif_workflow_helpers"
 version = "0.1.0"
@@ -25,6 +28,7 @@ dependencies = [
   "azure-ai-agents",
   "azure-identity",
   "pyyaml",
+  "python-frontmatter",
 ]
 
 [project.optional-dependencies]
@@ -38,6 +42,6 @@ dev = [
 Homepage = "https://github.com/peteroden/AIFoundry_CICD"
 Source = "https://github.com/peteroden/AIFoundry_CICD"
 
-# Optional console script entry point (uncomment to enable)
-# [project.scripts]
-# aif-agents = "aif_workflow_helpers.aif_helper:main"
+# Console script entry points
+[project.scripts]
+aif-workflow-helper = "cli.main:main"

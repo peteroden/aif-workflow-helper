@@ -2,13 +2,13 @@ import json
 import yaml
 import frontmatter
 
-from .name_validation import validate_agent_name
-from .format_constants import get_glob_pattern, get_file_extension, get_alternative_extensions
+from utils.validation import validate_agent_name
+from core.formats import get_glob_pattern, get_file_extension, get_alternative_extensions
 from glob import glob
 from collections import defaultdict
 from pathlib import Path
 from azure.ai.agents import AgentsClient, models
-from .logging_utils import logger
+from utils.logging import logger
 
 def read_agent_file(file_path: str) -> dict | None:
     """Read a single agent file in any supported format.

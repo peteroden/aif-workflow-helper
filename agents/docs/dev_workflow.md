@@ -29,21 +29,3 @@ People and process are needed in addition to technology/platform
 Tie thread ID back to the evaluation run in the logs with the Thread ID
 
 CD is either manual or automated
-
-=======
-# Dev Workflow
-
-## Overview
-
-```mermaid
-graph TD
-  CreateBranch[Create Branch] --> Clone[Clone branch to local]
-  Clone --> HydrateProject[Create and Hydrate AIF Project from files in repo with aif.sh script]
-  HydrateProject --> Experiment
-  Experiment --> Evaluate{Evaluate the results}
-  Evaluate -->|Implement| Save[Dehydrate changes with aif.sh script into branch]
-  Evaluate -->|Do Not Implement| DoNotSave[Handle failure case]
-  Save --> PR
-  DoNotSave --> PR
-  PR[Create Pull Request] --> Merge[Merge PR into main branch]
-```

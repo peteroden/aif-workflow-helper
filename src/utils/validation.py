@@ -1,5 +1,7 @@
+"""Name validation utilities for agent names."""
+
 import re
-from .logging_utils import logger
+from utils.logging import logger
 
 __all__ = ["validate_agent_name"]
 

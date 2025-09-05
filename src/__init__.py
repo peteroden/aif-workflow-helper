@@ -1,21 +1,27 @@
-from .upload_agent_helpers import (
+"""Azure AI Foundry Workflow Helpers.
+
+A Python package for managing Azure AI Foundry agents with support for 
+download, upload, and multi-format agent definitions.
+"""
+
+from core.upload import (
     create_or_update_agent,
     create_or_update_agents,
     create_or_update_agent_from_file,
     create_or_update_agents_from_files,
 )
 
-from .download_agent_helpers import (
+from core.download import (
     download_agents,
     download_agent,
 )
 
-from .logging_utils import (
+from utils.logging import (
     configure_logging,
     logger
 )
 
-from .format_constants import (
+from core.formats import (
     SUPPORTED_FORMATS,
     EXTENSION_MAP,
     GLOB_PATTERN_MAP,
@@ -24,6 +30,8 @@ from .format_constants import (
     get_alternative_extensions,
     is_supported_format
 )
+
+__version__ = "0.1.0"
 
 __all__ = [
     "configure_logging",
