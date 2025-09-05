@@ -5,7 +5,7 @@ from .validation import validate_agent_name
 
 __all__ = [
     "configure_logging",
-    "logger", 
+    "logger",
     "LOGGER_NAME",
     "validate_agent_name"
 ]
