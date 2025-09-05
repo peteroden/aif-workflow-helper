@@ -30,28 +30,32 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-
-    - name: Cache pip dependencies
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+    
+    - name: Cache uv global cache
       uses: actions/cache@v3
       with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
+        path: ~/.cache/uv
+        key: ${{ runner.os }}-uv-${{ hashFiles('pyproject.toml') }}-${{ matrix.python-version }}
         restore-keys: |
-          ${{ runner.os }}-pip-
+          ${{ runner.os }}-uv-
 
-    - name: Install dependencies
+    - name: Install project (editable) + dev deps
       run: |
-        python -m pip install --upgrade pip
-        pip install -e .[dev]
+        uv pip install --system -e .[dev]
 
     - name: Lint with ruff
       run: |
-        pip install ruff
+        uv pip install --system ruff
         ruff check . --output-format=github
 
     - name: Test with pytest
       run: |
-        pytest tests/ -v --tb=short --cov=src --cov-report=xml --cov-report=term-missing
+        uv pip install --system coverage
+        pytest tests/ -v --tb=short --cov=aif_workflow_helper --cov-report=xml --cov-report=term-missing
 
     - name: Upload coverage to Codecov
       if: ${{ inputs.coverage && matrix.python-version == '3.12' }}
@@ -75,17 +79,18 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: 3.12
-
-    - name: Test package installation
+    - name: Install uv
       run: |
-        python -m pip install --upgrade pip
-        pip install build
-        python -m build
-        pip install dist/*.whl
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+    - name: Build & install wheel
+      run: |
+        uv build
+        uv pip install --system dist/*.whl
         aif-workflow-helper --help
 
-    - name: Test CLI functionality
+    - name: Validate CLI & imports
       run: |
-        # Test that the CLI can be imported and run basic commands
-        python -c "from src.cli.main import main; print('CLI import successful')"
+        python -c "import aif_workflow_helper.utils.logging as l; print(l.logger.name)"
         aif-workflow-helper --help | grep "AI Foundry Agent Helper CLI"

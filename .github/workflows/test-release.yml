@@ -36,11 +36,11 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: "3.12"
-
-    - name: Install dependencies
+    - name: Install uv and supporting tools
       run: |
-        python -m pip install --upgrade pip
-        pip install bump2version build twine toml
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        uv pip install --system toml
 
     - name: Configure Git
       run: |
@@ -63,48 +63,42 @@ jobs:
         python -c "import toml; data=toml.load('pyproject.toml'); data['project']['version']='${TEST_VERSION}'; toml.dump(data, open('pyproject.toml', 'w'))"
         echo "version=$TEST_VERSION" >> $GITHUB_OUTPUT
 
-    - name: Build package
+    - name: Build package (uv)
       run: |
-        python -m build
+        uv build
 
     - name: Check package contents
       run: |
-        twine check dist/*
-        echo "--- Package contents ---"
-        tar -tzf dist/*.tar.gz | head -20
+        uvx twine check dist/*
+        echo "--- Package contents (sdist top) ---"
+        tar -tzf dist/*.tar.gz | head -40 || true
         echo "--- Wheel contents ---"
-        python -m zipfile -l dist/*.whl
+        python -c "import zipfile,glob; w=glob.glob('dist/*.whl')[0]; z=zipfile.ZipFile(w); print('\n'.join(z.namelist()))"
 
-    - name: Test local installation
+    - name: Test local installation (uv)
       run: |
-        pip install dist/*.whl
+        uv pip install --system dist/*.whl
         echo "--- Testing CLI ---"
         aif-workflow-helper --help
-        echo "--- Testing import ---"
-        python -c "import aif_workflow_helper; print('Import successful')"
+        echo "--- Testing import + nested modules ---"
+        python -c "import aif_workflow_helper.utils.logging as lg; import aif_workflow_helper.core.upload as up; print('Imports OK:', lg.logger.name, up.__name__)"
 
-    - name: Publish to Test PyPI
+    - name: Publish to Test PyPI (uvx twine)
       env:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
       run: |
-        twine upload --repository testpypi dist/*
+        uvx twine upload --repository testpypi dist/*
 
-    - name: Test installation from Test PyPI
+    - name: Test installation from Test PyPI (isolated)
       run: |
-        # Wait a bit for Test PyPI to process
-        sleep 30
-        
-        # Create fresh environment
+        sleep 25
         python -m venv test_env
         source test_env/bin/activate
-        
-        # Install from Test PyPI
+        pip install --upgrade pip
         pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ aif-workflow-helper==${{ steps.version.outputs.version }}
-        
-        # Test the installation
-        aif-workflow-helper --help
-        python -c "import aif_workflow_helper; print('Test PyPI installation successful')"
+        aif-workflow-helper --help | grep "AI Foundry Agent Helper CLI"
+        python -c "import aif_workflow_helper.core.download as d; print('Remote install OK:', d.__name__)"
 
     - name: Cleanup test files
       run: |
