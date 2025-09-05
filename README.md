@@ -318,3 +318,54 @@ Found X agents
 Processing 1/X: agent-name
 ✅ Successfully processed agent-name
 ```
+
+## 🔄 CI/CD Pipeline
+
+This project includes a comprehensive CI/CD pipeline using GitHub Actions that ensures code quality and functionality.
+
+### Pipeline Features
+
+- **Multi-Python Version Testing**: Tests on Python 3.10, 3.11, and 3.12
+- **Automated Testing**: Runs all pytest tests with coverage reporting
+- **Code Quality**: Includes linting with flake8
+- **Package Testing**: Verifies the package can be built and installed correctly
+- **CLI Testing**: Ensures the command-line interface works after installation
+
+### Branch Protection
+
+The main branch is protected with the following requirements:
+
+- ✅ **Pull Request Required**: Direct pushes to main are not allowed
+- ✅ **Tests Must Pass**: All CI checks must pass before merging
+- ✅ **Code Review**: At least 1 approval required
+- ✅ **Up-to-date Branch**: Branches must be current with main
+
+### Running Tests Locally
+
+Before submitting a PR, run tests locally to ensure they pass:
+
+```bash
+# Activate virtual environment
+source .venv/bin/activate
+
+# Install with dev dependencies
+pip install -e .[dev]
+
+# Run tests
+pytest tests/ -v --tb=short
+
+# Run with coverage
+pytest tests/ -v --cov=src --cov-report=term-missing
+
+# Check CLI functionality
+aif-workflow-helper --help
+```
+
+### Contributing
+
+1. Create a feature branch from `main`
+2. Make your changes
+3. Ensure all tests pass locally
+4. Submit a pull request
+5. Wait for CI to pass and get code review approval
+6. Merge when approved
