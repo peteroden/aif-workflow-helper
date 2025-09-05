@@ -1,6 +1,6 @@
-# Azure AI Agents Workflow Helpers
+# Azure AI Foundry Workflow Helpers
 
-Utilities for exporting (downloading) and importing (creating/updating) Azure AI Agents along with dependency awareness, normalization, and consistent logging.
+Utilities for exporting (downloading) and importing (creating/updating) Azure AI Foundry Agents along with dependency awareness, normalization, and consistent logging.
 
 ## 🚀 Quick Start
 
