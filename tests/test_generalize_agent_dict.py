@@ -1,5 +1,4 @@
 from unittest.mock import MagicMock
-import pytest
 from src.core.download import generalize_agent_dict
 
 def make_agent(name):

@@ -1,4 +1,3 @@
-import pytest
 from unittest.mock import MagicMock
 from src.core.upload import create_or_update_agent
 from . import test_consts
