@@ -40,8 +40,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/peteroden/AIFoundry_CICD"
-Source = "https://github.com/peteroden/AIFoundry_CICD"
+Homepage = "https://github.com/peteroden/aif-workflow-helper"
+Source = "https://github.com/peteroden/aif-workflow-helper"
 
 # Console script entry points
 [project.scripts]
