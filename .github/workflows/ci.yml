@@ -37,10 +37,8 @@ jobs:
     - name: Lint with ruff
       run: |
         pip install ruff
-        # Check for syntax errors and undefined names
-        ruff check . --select=E9,F63,F7,F82 --output-format=github
-        # Run full linting (will show warnings but not fail)
-        ruff check . --output-format=github --exit-zero
+        # Run full linting - will fail CI if issues are found
+        ruff check . --output-format=github
 
     - name: Test with pytest
       run: |
