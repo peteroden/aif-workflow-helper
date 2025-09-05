@@ -44,4 +44,4 @@ Source = "https://github.com/peteroden/AIFoundry_CICD"
 
 # Console script entry points
 [project.scripts]
-aif-workflow-helper = "cli.main:main"
+aif-workflow-helper = "src.cli.main:main"
