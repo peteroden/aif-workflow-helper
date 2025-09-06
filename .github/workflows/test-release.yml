@@ -55,7 +55,7 @@ jobs:
         echo "version=$TEST_VERSION" >> $GITHUB_OUTPUT
 
     - name: Build and publish package
-      uses: ./.github/actions/build-and-publish/buildpublish.yml
+      uses: ./.github/actions/build-and-publish
       with:
         version: ${{ steps.version.outputs.version }}
         repository: testpypi

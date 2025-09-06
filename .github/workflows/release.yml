@@ -147,7 +147,7 @@ jobs:
         python-version: "3.12"
 
     - name: Build and publish package
-      uses: ./.github/actions/build-and-publish/buildpublish.yml
+      uses: ./.github/actions/build-and-publish
       with:
         version: ${{ needs.create-release.outputs.version }}
         repository: pypi
