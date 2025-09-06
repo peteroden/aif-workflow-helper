@@ -6,6 +6,10 @@ build-backend = "uv_build"
 module-name = "aif_workflow_helper"
 namespace = true
 
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
 [project]
 name = "aif-workflow-helper"
 version = "0.1.0"
@@ -46,4 +50,3 @@ Source = "https://github.com/peteroden/aif-workflow-helper"
 # Console script entry points
 [project.scripts]
 aif-workflow-helper = "aif_workflow_helper.cli.main:main"
-

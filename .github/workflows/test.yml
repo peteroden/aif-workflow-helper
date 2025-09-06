@@ -93,4 +93,5 @@ jobs:
     - name: Validate CLI & imports
       run: |
         python -c "import aif_workflow_helper.utils.logging as l; print(l.logger.name)"
+
         aif-workflow-helper --help | grep "AI Foundry Agent Helper CLI"
