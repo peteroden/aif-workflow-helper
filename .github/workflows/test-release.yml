@@ -25,7 +25,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
-
     steps:
     - uses: actions/checkout@v4
       with:
@@ -36,59 +35,61 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: "3.12"
+
     - name: Install uv and supporting tools
       run: |
         curl -LsSf https://astral.sh/uv/install.sh | sh
         echo "$HOME/.local/bin" >> $GITHUB_PATH
         uv pip install --system toml
 
-    - name: Configure Git
-      run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-
     - name: Create test version (no commit)
       id: version
       run: |
-        # Get current version
+        set -e
         CURRENT_VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
         echo "Current version: $CURRENT_VERSION"
-        
-        # Create a test version with timestamp to avoid conflicts
         TIMESTAMP=$(date +%Y%m%d%H%M%S)
-        TEST_VERSION="${CURRENT_VERSION}+test.${TIMESTAMP}"
+        TEST_VERSION="${CURRENT_VERSION}.dev${TIMESTAMP}"
         echo "Test version: $TEST_VERSION"
-        
-        # Update version in pyproject.toml for testing (without committing)
-        python -c "import toml; data=toml.load('pyproject.toml'); data['project']['version']='${TEST_VERSION}'; toml.dump(data, open('pyproject.toml', 'w'))"
+        python -c "import toml; d=toml.load('pyproject.toml'); d['project']['version']='${TEST_VERSION}'; toml.dump(d, open('pyproject.toml','w'))"
         echo "version=$TEST_VERSION" >> $GITHUB_OUTPUT
 
     - name: Build package (uv)
       run: |
         uv build
 
-    - name: Check package contents
+    - name: Inspect artifacts & validate
       run: |
+        set -e
+        echo "--- dist listing ---"
+        ls -l dist
+        echo "--- twine check ---"
         uvx twine check dist/*
-        echo "--- Package contents (sdist top) ---"
+        echo "--- sdist preview ---"
         tar -tzf dist/*.tar.gz | head -40 || true
-        echo "--- Wheel contents ---"
-        python -c "import zipfile,glob; w=glob.glob('dist/*.whl')[0]; z=zipfile.ZipFile(w); print('\n'.join(z.namelist()))"
+        echo "--- wheel file name ---"
+        WHEEL=$(ls dist/*.whl | head -n1)
+        echo "Wheel: $WHEEL"
+        echo "--- wheel contents ---"
+        python -c "import zipfile,glob; w=glob.glob('dist/*.whl')[0]; z=zipfile.ZipFile(w); print('\\n'.join(z.namelist())); meta=[n for n in z.namelist() if n.endswith('METADATA')]; print('\\n--- METADATA (truncated) ---\\n'+ z.read(meta[0]).decode(errors='replace')[:1500] if meta else 'No METADATA file')"
+        echo "--- version validation ---"
+        INTENDED='${{ steps.version.outputs.version }}'
+        case "$WHEEL" in *"$INTENDED"*) echo "Version validation passed ($INTENDED)";; *) echo "ERROR: Intended version $INTENDED not found in wheel filename $WHEEL" >&2; exit 1;; esac
 
     - name: Test local installation (uv)
       run: |
         uv pip install --system dist/*.whl
-        echo "--- Testing CLI ---"
-        aif-workflow-helper --help
-        echo "--- Testing import + nested modules ---"
-        python -c "import aif_workflow_helper.utils.logging as lg; import aif_workflow_helper.core.upload as up; print('Imports OK:', lg.logger.name, up.__name__)"
+        aif-workflow-helper --help | head -n 2
+        python -c "import aif_workflow_helper.utils.logging as lg; import aif_workflow_helper.core.upload as up; print('Local imports OK:', lg.logger.name, up.__name__)"
 
     - name: Publish to Test PyPI (uvx twine)
       env:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
       run: |
-        uvx twine upload --repository testpypi dist/*
+        set -e
+        echo "Uploading (verbose) to Test PyPI"
+        uvx twine upload --verbose --repository testpypi dist/*
 
     - name: Test installation from Test PyPI (isolated)
       run: |
@@ -97,11 +98,11 @@ jobs:
         source test_env/bin/activate
         pip install --upgrade pip
         pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ aif-workflow-helper==${{ steps.version.outputs.version }}
-        aif-workflow-helper --help | grep "AI Foundry Agent Helper CLI"
+        aif-workflow-helper --help | head -n 2
         python -c "import aif_workflow_helper.core.download as d; print('Remote install OK:', d.__name__)"
 
-    - name: Cleanup test files
+    - name: Cleanup
+      if: always()
       run: |
-        rm -rf dist/
-        rm -rf test_env/
-        git checkout pyproject.toml  # Restore original version
+        rm -rf dist/ test_env/
+        git checkout pyproject.toml || true
