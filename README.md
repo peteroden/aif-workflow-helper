@@ -15,7 +15,7 @@ export PROJECT_ENDPOINT='your-ai-foundry-endpoint-here'
 
 ```bash
 export AZURE_TENANT_ID='16b3c013-d300-468d-ac64-7eda0820b6d3'
-export PROJECT_ENDPOINT='https://peroden-2927-resource.services.ai.azure.com/api/projects/peroden-2927'
+export PROJECT_ENDPOINT='https://your-resource.services.ai.azure.com/api/projects/your-project'
 ```
 
 > **Note:** You can also provide these values via CLI parameters (`--azure-tenant-id` and `--project-endpoint`) which will take precedence over environment variables.
