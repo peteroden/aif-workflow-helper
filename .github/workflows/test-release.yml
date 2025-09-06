@@ -54,52 +54,15 @@ jobs:
         python -c "import toml; d=toml.load('pyproject.toml'); d['project']['version']='${TEST_VERSION}'; toml.dump(d, open('pyproject.toml','w'))"
         echo "version=$TEST_VERSION" >> $GITHUB_OUTPUT
 
-    - name: Build package (uv)
-      run: |
-        uv build
-
-    - name: Inspect artifacts & validate
-      run: |
-        set -e
-        echo "--- dist listing ---"
-        ls -l dist
-        echo "--- twine check ---"
-        uvx twine check dist/*
-        echo "--- sdist preview ---"
-        tar -tzf dist/*.tar.gz | head -40 || true
-        echo "--- wheel file name ---"
-        WHEEL=$(ls dist/*.whl | head -n1)
-        echo "Wheel: $WHEEL"
-        echo "--- wheel contents ---"
-        python -c "import zipfile,glob; w=glob.glob('dist/*.whl')[0]; z=zipfile.ZipFile(w); print('\\n'.join(z.namelist())); meta=[n for n in z.namelist() if n.endswith('METADATA')]; print('\\n--- METADATA (truncated) ---\\n'+ z.read(meta[0]).decode(errors='replace')[:1500] if meta else 'No METADATA file')"
-        echo "--- version validation ---"
-        INTENDED='${{ steps.version.outputs.version }}'
-        case "$WHEEL" in *"$INTENDED"*) echo "Version validation passed ($INTENDED)";; *) echo "ERROR: Intended version $INTENDED not found in wheel filename $WHEEL" >&2; exit 1;; esac
-
-    - name: Test local installation (uv)
-      run: |
-        uv pip install --system dist/*.whl
-        aif-workflow-helper --help | head -n 2
-        python -c "import aif_workflow_helper.utils.logging as lg; import aif_workflow_helper.core.upload as up; print('Local imports OK:', lg.logger.name, up.__name__)"
-
-    - name: Publish to Test PyPI (uvx twine)
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
-      run: |
-        set -e
-        echo "Uploading (verbose) to Test PyPI"
-        uvx twine upload --verbose --repository testpypi dist/*
-
-    - name: Test installation from Test PyPI (isolated)
-      run: |
-        sleep 25
-        python -m venv test_env
-        source test_env/bin/activate
-        pip install --upgrade pip
-        pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ aif-workflow-helper==${{ steps.version.outputs.version }}
-        aif-workflow-helper --help | head -n 2
-        python -c "import aif_workflow_helper.core.download as d; print('Remote install OK:', d.__name__)"
+    - name: Build and publish package
+      uses: ./.github/actions/build-and-publish/buildpublish.yml
+      with:
+        version: ${{ steps.version.outputs.version }}
+        repository: testpypi
+        twine-username: __token__
+        twine-password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+        test-install: 'true'
+        package-name: aif-workflow-helper
 
     - name: Cleanup
       if: always()
