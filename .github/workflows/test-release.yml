@@ -25,7 +25,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
-
     steps:
     - uses: actions/checkout@v4
       with:
@@ -37,77 +36,36 @@ jobs:
       with:
         python-version: "3.12"
 
-    - name: Install dependencies
+    - name: Install uv and supporting tools
       run: |
-        python -m pip install --upgrade pip
-        pip install bump2version build twine
-
-    - name: Configure Git
-      run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        uv pip install --system toml
 
     - name: Create test version (no commit)
       id: version
       run: |
-        # Get current version
+        set -e
         CURRENT_VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
         echo "Current version: $CURRENT_VERSION"
-        
-        # Create a test version with timestamp to avoid conflicts
         TIMESTAMP=$(date +%Y%m%d%H%M%S)
-        TEST_VERSION="${CURRENT_VERSION}+test.${TIMESTAMP}"
+        TEST_VERSION="${CURRENT_VERSION}.dev${TIMESTAMP}"
         echo "Test version: $TEST_VERSION"
-        
-        # Update version in pyproject.toml for testing (without committing)
-        python -c "import toml; data=toml.load('pyproject.toml'); data['project']['version']='${TEST_VERSION}'; toml.dump(data, open('pyproject.toml', 'w'))"
+        python -c "import toml; d=toml.load('pyproject.toml'); d['project']['version']='${TEST_VERSION}'; toml.dump(d, open('pyproject.toml','w'))"
         echo "version=$TEST_VERSION" >> $GITHUB_OUTPUT
 
-    - name: Build package
-      run: |
-        python -m build
+    - name: Build and publish package
+      uses: ./.github/actions/build-and-publish
+      with:
+        version: ${{ steps.version.outputs.version }}
+        repository: testpypi
+        twine-username: __token__
+        twine-password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+        test-install: 'true'
+        package-name: aif-workflow-helper
 
-    - name: Check package contents
+    - name: Cleanup
+      if: always()
       run: |
-        twine check dist/*
-        echo "--- Package contents ---"
-        tar -tzf dist/*.tar.gz | head -20
-        echo "--- Wheel contents ---"
-        python -m zipfile -l dist/*.whl
-
-    - name: Test local installation
-      run: |
-        pip install dist/*.whl
-        echo "--- Testing CLI ---"
-        aif-workflow-helper --help
-        echo "--- Testing import ---"
-        python -c "import aif_workflow_helper; print('Import successful')"
-
-    - name: Publish to Test PyPI
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
-      run: |
-        twine upload --repository testpypi dist/*
-
-    - name: Test installation from Test PyPI
-      run: |
-        # Wait a bit for Test PyPI to process
-        sleep 30
-        
-        # Create fresh environment
-        python -m venv test_env
-        source test_env/bin/activate
-        
-        # Install from Test PyPI
-        pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ aif-workflow-helper==${{ steps.version.outputs.version }}
-        
-        # Test the installation
-        aif-workflow-helper --help
-        python -c "import aif_workflow_helper; print('Test PyPI installation successful')"
-
-    - name: Cleanup test files
-      run: |
-        rm -rf dist/
-        rm -rf test_env/
-        git checkout pyproject.toml  # Restore original version
+        rm -rf dist/ test_env/
+        git checkout pyproject.toml || true

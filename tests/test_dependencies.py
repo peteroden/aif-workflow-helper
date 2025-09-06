@@ -1,10 +1,10 @@
 import pytest
 
-from src.core.upload import (
+from aif_workflow_helper.core.upload import (
     extract_dependencies,
     dependency_sort,
 )
-from src.utils.logging import configure_logging
+from aif_workflow_helper.utils.logging import configure_logging
 from . import test_consts
 
 configure_logging(propagate=True)

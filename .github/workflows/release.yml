@@ -1,8 +1,9 @@
 name: Release
 
 on:
-  push:
-    branches: [ main ]
+  # Temporarily disabled auto-trigger to prevent accidental releases
+  # push:
+  #   branches: [ main ]
   workflow_dispatch:
     inputs:
       version_bump:
@@ -41,10 +42,11 @@ jobs:
       with:
         python-version: "3.12"
 
-    - name: Install dependencies
+    - name: Install uv and dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install bump2version
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        uv pip install --system bump2version toml
 
     - name: Configure Git
       run: |
@@ -144,25 +146,15 @@ jobs:
       with:
         python-version: "3.12"
 
-    - name: Install build dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install build twine
-
-    - name: Build package
-      run: |
-        python -m build
-
-    - name: Check package
-      run: |
-        twine check dist/*
-
-    - name: Publish to PyPI
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-      run: |
-        twine upload dist/*
+    - name: Build and publish package
+      uses: ./.github/actions/build-and-publish
+      with:
+        version: ${{ needs.create-release.outputs.version }}
+        repository: pypi
+        twine-username: __token__
+        twine-password: ${{ secrets.PYPI_API_TOKEN }}
+        test-install: 'true'
+        package-name: aif-workflow-helper
 
   update-main:
     needs: [create-release, publish-pypi]

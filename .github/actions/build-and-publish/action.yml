@@ -1,0 +1,114 @@
+name: 'Build and Publish Python Package'
+description: 'Robust build, validation, and publishing of Python package with comprehensive diagnostics'
+
+inputs:
+  version:
+    description: 'Package version to build'
+    required: true
+  repository:
+    description: 'PyPI repository (pypi or testpypi)'
+    required: true
+    default: 'pypi'
+  twine-username:
+    description: 'Twine username'
+    required: true
+    default: '__token__'
+  twine-password:
+    description: 'Twine password/token'
+    required: true
+  test-install:
+    description: 'Whether to test installation from repository after upload'
+    required: false
+    default: 'true'
+  package-name:
+    description: 'Package name for installation test'
+    required: false
+    default: 'aif-workflow-helper'
+
+outputs:
+  wheel-path:
+    description: 'Path to built wheel file'
+    value: ${{ steps.build.outputs.wheel-path }}
+  sdist-path:
+    description: 'Path to built source distribution'
+    value: ${{ steps.build.outputs.sdist-path }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install uv and supporting tools
+      shell: bash
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        uv pip install --system toml
+
+    - name: Build package (uv)
+      id: build
+      shell: bash
+      run: |
+        uv build
+        echo "wheel-path=$(ls dist/*.whl | head -n1)" >> $GITHUB_OUTPUT
+        echo "sdist-path=$(ls dist/*.tar.gz | head -n1)" >> $GITHUB_OUTPUT
+
+    - name: Inspect artifacts & validate
+      shell: bash
+      run: |
+        set -e
+        echo "--- dist listing ---"
+        ls -l dist
+        echo "--- twine check ---"
+        uvx twine check dist/*
+        echo "--- sdist preview ---"
+        tar -tzf dist/*.tar.gz | head -40 || true
+        echo "--- wheel file name ---"
+        WHEEL=$(ls dist/*.whl | head -n1)
+        echo "Wheel: $WHEEL"
+        echo "--- wheel contents ---"
+        python -c "import zipfile,glob; w=glob.glob('dist/*.whl')[0]; z=zipfile.ZipFile(w); print('\\n'.join(z.namelist())); meta=[n for n in z.namelist() if n.endswith('METADATA')]; print('\\n--- METADATA (truncated) ---\\n'+ z.read(meta[0]).decode(errors='replace')[:1500] if meta else 'No METADATA file')"
+        echo "--- version validation ---"
+        INTENDED='${{ inputs.version }}'
+        case "$WHEEL" in *"$INTENDED"*) echo "Version validation passed ($INTENDED)";; *) echo "ERROR: Intended version $INTENDED not found in wheel filename $WHEEL" >&2; exit 1;; esac
+
+    - name: Test local installation (uv)
+      shell: bash
+      run: |
+        uv pip install --system dist/*.whl
+        aif-workflow-helper --help | head -n 2
+        python -c "import aif_workflow_helper.utils.logging as lg; import aif_workflow_helper.core.upload as up; print('Local imports OK:', lg.logger.name, up.__name__)"
+
+    - name: Publish to repository
+      shell: bash
+      env:
+        TWINE_USERNAME: ${{ inputs.twine-username }}
+        TWINE_PASSWORD: ${{ inputs.twine-password }}
+      run: |
+        set -e
+        REPO_FLAG=""
+        if [ "${{ inputs.repository }}" = "testpypi" ]; then
+          REPO_FLAG="--repository testpypi"
+        fi
+        echo "Uploading (verbose) to ${{ inputs.repository }}"
+        uvx twine upload --verbose $REPO_FLAG dist/*
+
+    - name: Test installation from repository (isolated)
+      if: inputs.test-install == 'true'
+      shell: bash
+      run: |
+        sleep 25
+        python -m venv test_env
+        source test_env/bin/activate
+        pip install --upgrade pip
+        if [ "${{ inputs.repository }}" = "testpypi" ]; then
+          pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ ${{ inputs.package-name }}==${{ inputs.version }}
+        else
+          pip install ${{ inputs.package-name }}==${{ inputs.version }}
+        fi
+        aif-workflow-helper --help | head -n 2
+        python -c "import aif_workflow_helper.core.download as d; print('Remote install OK:', d.__name__)"
+
+    - name: Cleanup
+      if: always()
+      shell: bash
+      run: |
+        rm -rf test_env/ || true
