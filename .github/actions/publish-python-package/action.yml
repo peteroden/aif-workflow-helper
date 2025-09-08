@@ -1,0 +1,105 @@
+name: 'Publish Python Package'
+description: 'Publish Python package to PyPI/TestPyPI with installation testing'
+
+inputs:
+  version:
+    description: 'Package version'
+    required: true
+  repository:
+    description: 'PyPI repository (pypi or testpypi)'
+    required: true
+    default: 'pypi'
+  twine-username:
+    description: 'Twine username'
+    required: true
+    default: '__token__'
+  twine-password:
+    description: 'Twine password/token'
+    required: true
+  package-name:
+    description: 'Package name for installation test'
+    required: false
+    default: 'aif-workflow-helper'
+  dist-dir:
+    description: 'Directory containing artifacts to publish'
+    required: false
+    default: 'dist'
+  test-install:
+    description: 'Whether to test installation after upload'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Publish to repository
+      shell: bash
+      env:
+        TWINE_USERNAME: ${{ inputs.twine-username }}
+        TWINE_PASSWORD: ${{ inputs.twine-password }}
+      run: |
+        set -e
+        REPO_FLAG=""
+        if [ "${{ inputs.repository }}" = "testpypi" ]; then
+          REPO_FLAG="--repository testpypi"
+        fi
+        
+        echo "📦 Publishing ${{ inputs.package-name }}==${{ inputs.version }} to ${{ inputs.repository }}"
+        echo "📁 Files to upload:"
+        ls -la ${{ inputs.dist-dir }}/
+        
+        if uvx twine upload --verbose $REPO_FLAG ${{ inputs.dist-dir }}/*; then
+          echo "✅ Upload successful!"
+        else
+          echo "❌ Upload failed. Common causes:"
+          echo "  - Version already exists"
+          echo "  - Authentication issues"
+          echo "  - Network problems"
+          exit 1
+        fi
+
+    - name: Test installation
+      if: inputs.test-install == 'true'
+      shell: bash
+      run: |
+        echo "⏳ Waiting for package availability..."
+        sleep 30
+        
+        python -m venv test_env
+        source test_env/bin/activate
+        pip install --upgrade pip
+        
+        # Retry installation with backoff
+        for attempt in {1..5}; do
+          echo "🔄 Installation attempt $attempt/5"
+          
+          if [ "${{ inputs.repository }}" = "testpypi" ]; then
+            if pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ ${{ inputs.package-name }}==${{ inputs.version }}; then
+              echo "✅ Installation successful!"
+              break
+            fi
+          else
+            if pip install ${{ inputs.package-name }}==${{ inputs.version }}; then
+              echo "✅ Installation successful!"
+              break
+            fi
+          fi
+          
+          if [ $attempt -lt 5 ]; then
+            echo "⏳ Waiting 30s before retry..."
+            sleep 30
+          else
+            echo "❌ Installation failed after 5 attempts"
+            exit 1
+          fi
+        done
+        
+        echo "🧪 Testing installed package..."
+        ${{ inputs.package-name }} --help | head -n 2
+        python -c "import aif_workflow_helper.core.download as d; print('✅ Remote install OK:', d.__name__)"
+
+    - name: Cleanup
+      if: always()
+      shell: bash
+      run: |
+        rm -rf test_env/ || true

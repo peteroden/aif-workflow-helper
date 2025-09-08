@@ -1,0 +1,164 @@
+name: 'Create GitHub Release'
+description: 'Create GitHub release with artifacts and generated release notes'
+
+inputs:
+  release-tag:
+    description: 'Git tag for the release'
+    required: true
+  release-title:
+    description: 'Title for the GitHub release'
+    required: true
+  github-token:
+    description: 'GitHub token for release creation'
+    required: true
+  package-name:
+    description: 'Package name'
+    required: false
+    default: 'aif-workflow-helper'
+  version:
+    description: 'Package version'
+    required: true
+  prerelease:
+    description: 'Mark release as prerelease'
+    required: false
+    default: 'false'
+  changelog:
+    description: 'Changelog content for production releases'
+    required: false
+    default: ''
+  release-notes:
+    description: 'Additional release notes content'
+    required: false
+    default: ''
+  dist-dir:
+    description: 'Directory containing build artifacts'
+    required: false
+    default: 'dist'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Validate inputs
+      shell: bash
+      run: |
+        if [ -z "${{ inputs.release-tag }}" ] || [ -z "${{ inputs.github-token }}" ]; then
+          echo "❌ Error: release-tag and github-token are required"
+          exit 1
+        fi
+        echo "✅ Release inputs validated"
+
+    - name: Create repository archive
+      shell: bash
+      run: |
+        echo "📁 Creating source archive..."
+        git archive --format=zip --output=${{ inputs.package-name }}-${{ inputs.version }}-source.zip HEAD
+        echo "✅ Created: ${{ inputs.package-name }}-${{ inputs.version }}-source.zip"
+
+    - name: Prepare release artifacts
+      shell: bash
+      run: |
+        echo "📦 Preparing release artifacts..."
+        mkdir -p release-artifacts
+        
+        # Copy build artifacts
+        if [ -d "${{ inputs.dist-dir }}" ]; then
+          cp ${{ inputs.dist-dir }}/*.whl release-artifacts/ 2>/dev/null || echo "No wheel files found"
+          cp ${{ inputs.dist-dir }}/*.tar.gz release-artifacts/ 2>/dev/null || echo "No source distribution found"
+        fi
+        
+        # Copy source archive
+        cp *.zip release-artifacts/ 2>/dev/null || echo "No zip files found"
+        
+        echo "📋 Release artifacts:"
+        ls -la release-artifacts/
+
+    - name: Generate release notes
+      shell: bash
+      run: |
+        echo "📝 Generating release notes..."
+        
+        # Set parameters based on release type
+        if [ "${{ inputs.prerelease }}" = "true" ]; then
+          RELEASE_TYPE="Test Release"
+          DESCRIPTION="This is an automated test release for validation purposes."
+          INSTALL_SECTION="### Test PyPI Installation"
+          INSTALL_CMD="pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ ${{ inputs.package-name }}==${{ inputs.version }}"
+          FOOTER_NOTE="> **Note**: This is a test release. For production releases, see the main releases."
+        else
+          RELEASE_TYPE="Release"
+          DESCRIPTION="Production release with the latest features and improvements."
+          INSTALL_SECTION="### Installation"
+          INSTALL_CMD="pip install ${{ inputs.package-name }}==${{ inputs.version }}"
+          FOOTER_NOTE=""
+        fi
+        
+        # Build changelog section
+        CHANGES_SECTION=""
+        if [ -n "${{ inputs.changelog }}" ] && [ "${{ inputs.prerelease }}" != "true" ]; then
+          CHANGES_SECTION="### Changes in ${{ inputs.version }}
+
+        ${{ inputs.changelog }}
+
+        "
+        fi
+        
+        # Generate release notes
+        cat > release-notes.md << EOF
+        ## ${RELEASE_TYPE} ${{ inputs.release-tag }}
+        
+        ${DESCRIPTION}
+        
+        ### Artifacts Included
+        - 🐍 **Python Wheel**: Ready-to-install package
+        - 📦 **Source Distribution**: Complete package source  
+        - 📁 **Repository Archive**: Full source code snapshot
+        
+        ${CHANGES_SECTION}${INSTALL_SECTION}
+        \`\`\`bash
+        ${INSTALL_CMD}
+        \`\`\`
+        
+        ### CLI Usage
+        \`\`\`bash
+        ${{ inputs.package-name }} --help
+        \`\`\`
+        
+        ${{ inputs.release-notes }}
+        
+        ${FOOTER_NOTE}
+        EOF
+        
+        echo "✅ Release notes generated"
+
+    - name: Create GitHub release
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        echo "🚀 Creating GitHub release..."
+        
+        PRERELEASE_FLAG=""
+        if [ "${{ inputs.prerelease }}" = "true" ]; then
+          PRERELEASE_FLAG="--prerelease"
+        fi
+        
+        if gh release create "${{ inputs.release-tag }}" \
+          release-artifacts/* \
+          --title "${{ inputs.release-title }}" \
+          --notes-file release-notes.md \
+          $PRERELEASE_FLAG; then
+          echo "✅ GitHub release created successfully!"
+          echo "🔗 View at: https://github.com/${{ github.repository }}/releases/tag/${{ inputs.release-tag }}"
+        else
+          echo "❌ Failed to create GitHub release"
+          echo "📋 Available artifacts:"
+          ls -la release-artifacts/
+          exit 1
+        fi
+
+    - name: Cleanup
+      if: always()
+      shell: bash
+      run: |
+        rm -rf release-artifacts/ || true
+        rm -f *.zip release-notes.md || true

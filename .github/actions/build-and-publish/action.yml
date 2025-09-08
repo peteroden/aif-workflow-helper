@@ -116,22 +116,73 @@ runs:
         if [ "${{ inputs.repository }}" = "testpypi" ]; then
           REPO_FLAG="--repository testpypi"
         fi
-        echo "Uploading (verbose) to ${{ inputs.repository }}"
-        uvx twine upload --verbose $REPO_FLAG dist/*
+        
+        echo "📦 Uploading to ${{ inputs.repository }}..."
+        echo "Package: ${{ inputs.package-name }} version ${{ inputs.version }}"
+        echo "Files to upload:"
+        ls -la dist/
+        
+        if uvx twine upload --verbose $REPO_FLAG dist/*; then
+          echo "✅ Upload successful to ${{ inputs.repository }}"
+          echo "Package ${{ inputs.package-name }}==${{ inputs.version }} should be available shortly"
+        else
+          echo "❌ Upload failed to ${{ inputs.repository }}"
+          echo "This might be due to:"
+          echo "- Version already exists"
+          echo "- Authentication issues"
+          echo "- Network problems"
+          exit 1
+        fi
 
     - name: Test installation from repository (isolated)
       if: inputs.test-install == 'true'
       shell: bash
       run: |
-        sleep 25
+        echo "Waiting for package to be available on ${{ inputs.repository }}..."
+        sleep 30
+        
         python -m venv test_env
         source test_env/bin/activate
         pip install --upgrade pip
-        if [ "${{ inputs.repository }}" = "testpypi" ]; then
-          pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ ${{ inputs.package-name }}==${{ inputs.version }}
-        else
-          pip install ${{ inputs.package-name }}==${{ inputs.version }}
-        fi
+        
+        # Retry logic for package installation
+        RETRY_COUNT=0
+        MAX_RETRIES=5
+        RETRY_DELAY=30
+        
+        while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+          echo "Installation attempt $((RETRY_COUNT + 1))/$MAX_RETRIES for ${{ inputs.package-name }}==${{ inputs.version }}"
+          
+          if [ "${{ inputs.repository }}" = "testpypi" ]; then
+            if pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ ${{ inputs.package-name }}==${{ inputs.version }}; then
+              echo "✅ Package installation successful!"
+              break
+            fi
+          else
+            if pip install ${{ inputs.package-name }}==${{ inputs.version }}; then
+              echo "✅ Package installation successful!"
+              break
+            fi
+          fi
+          
+          RETRY_COUNT=$((RETRY_COUNT + 1))
+          if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+            echo "⏳ Installation failed, waiting ${RETRY_DELAY}s before retry..."
+            sleep $RETRY_DELAY
+          else
+            echo "❌ Package installation failed after $MAX_RETRIES attempts"
+            echo "Available versions on ${{ inputs.repository }}:"
+            if [ "${{ inputs.repository }}" = "testpypi" ]; then
+              pip index versions --index-url https://test.pypi.org/simple/ ${{ inputs.package-name }} || echo "Could not query available versions"
+            else
+              pip index versions ${{ inputs.package-name }} || echo "Could not query available versions"
+            fi
+            exit 1
+          fi
+        done
+        
+        # Test the installed package
+        echo "Testing CLI functionality..."
         aif-workflow-helper --help | head -n 2
         python -c "import aif_workflow_helper.core.download as d; print('Remote install OK:', d.__name__)"
 
