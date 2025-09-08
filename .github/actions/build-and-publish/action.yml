@@ -24,6 +24,34 @@ inputs:
     description: 'Package name for installation test'
     required: false
     default: 'aif-workflow-helper'
+  create-release:
+    description: 'Whether to create a GitHub release'
+    required: false
+    default: 'false'
+  release-tag:
+    description: 'Git tag for the release'
+    required: false
+    default: ''
+  release-title:
+    description: 'Title for the GitHub release'
+    required: false
+    default: ''
+  release-notes:
+    description: 'Additional release notes content (optional - action generates default notes)'
+    required: false
+    default: ''
+  changelog:
+    description: 'Changelog content for production releases'
+    required: false
+    default: ''
+  prerelease:
+    description: 'Mark release as prerelease'
+    required: false
+    default: 'false'
+  github-token:
+    description: 'GitHub token for release creation'
+    required: false
+    default: ''
 
 outputs:
   wheel-path:
@@ -107,8 +135,114 @@ runs:
         aif-workflow-helper --help | head -n 2
         python -c "import aif_workflow_helper.core.download as d; print('Remote install OK:', d.__name__)"
 
+    - name: Create repository archive
+      if: inputs.create-release == 'true'
+      shell: bash
+      run: |
+        # Create a clean archive of the repository without .git directory
+        git archive --format=zip --output=${{ inputs.package-name }}-${{ inputs.version }}-source.zip HEAD
+
+    - name: Prepare release artifacts
+      if: inputs.create-release == 'true'
+      shell: bash
+      run: |
+        # Create a release directory with all artifacts
+        mkdir -p release-artifacts
+        cp dist/*.whl release-artifacts/
+        cp dist/*.tar.gz release-artifacts/
+        cp *.zip release-artifacts/
+        echo "--- Release artifacts ---"
+        ls -la release-artifacts/
+
+    - name: Validate release inputs
+      if: inputs.create-release == 'true'
+      shell: bash
+      run: |
+        if [ -z "${{ inputs.release-tag }}" ] || [ -z "${{ inputs.github-token }}" ]; then
+          echo "Error: release-tag and github-token are required when create-release=true"
+          exit 1
+        fi
+
+    - name: Create GitHub Release with gh CLI
+      if: inputs.create-release == 'true'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        # Set parameters based on release type
+        if [ "${{ inputs.prerelease }}" = "true" ]; then
+          RELEASE_TYPE="Test Release"
+          DESCRIPTION="This is an automated test release for validation purposes."
+          INSTALL_SECTION="### Test PyPI Installation:"
+          INSTALL_CMD="pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ ${{ inputs.package-name }}==${{ inputs.version }}"
+          CHANGES_SECTION=""
+          FOOTER_NOTE="> **Note**: This is a test release. For production releases, see the main releases."
+        else
+          RELEASE_TYPE="Release"
+          DESCRIPTION="Production release with the latest features and improvements."
+          INSTALL_SECTION="### Installation:"
+          INSTALL_CMD="pip install ${{ inputs.package-name }}==${{ inputs.version }}"
+          if [ -n "${{ inputs.changelog }}" ]; then
+            CHANGES_SECTION="### Changes in ${{ inputs.version }}
+
+        ${{ inputs.changelog }}
+
+        "
+          else
+            CHANGES_SECTION=""
+          fi
+          FOOTER_NOTE=""
+        fi
+        
+        # Generate unified release notes
+        cat > release-notes.md << EOF
+        ## ${RELEASE_TYPE} ${{ inputs.release-tag }}
+        
+        ${DESCRIPTION}
+        
+        ### Artifacts Included:
+        - 🐍 **Python Wheel**: Ready-to-install package
+        - 📦 **Source Distribution**: Complete package source  
+        - 📁 **Repository Archive**: Full source code snapshot
+        
+        ${CHANGES_SECTION}${INSTALL_SECTION}
+        \`\`\`bash
+        ${INSTALL_CMD}
+        \`\`\`
+        
+        ### CLI Usage:
+        \`\`\`bash
+        aif-workflow-helper --help
+        \`\`\`
+        
+        ${{ inputs.release-notes }}
+        
+        ${FOOTER_NOTE}
+        EOF
+        
+        # Prepare gh release command flags
+        PRERELEASE_FLAG=""
+        if [ "${{ inputs.prerelease }}" = "true" ]; then
+          PRERELEASE_FLAG="--prerelease"
+        fi
+        
+        # Create the release with all artifacts
+        gh release create "${{ inputs.release-tag }}" \
+          release-artifacts/*.whl \
+          release-artifacts/*.tar.gz \
+          release-artifacts/*.zip \
+          --title "${{ inputs.release-title }}" \
+          --notes-file release-notes.md \
+          $PRERELEASE_FLAG || {
+            echo "Failed to create GitHub release for tag ${{ inputs.release-tag }}"
+            echo "Available artifacts:"
+            ls -la release-artifacts/
+            exit 1
+          }
+
     - name: Cleanup
       if: always()
       shell: bash
       run: |
-        rm -rf test_env/ || true
+        rm -rf test_env/ release-artifacts/ || true
+        rm -f *.zip release-notes.md || true

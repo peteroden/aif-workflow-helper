@@ -13,6 +13,10 @@ on:
           - minor
           - major
 
+permissions:
+  contents: write  # For creating releases
+  packages: write  # For publishing packages
+
 jobs:
   test:
     uses: ./.github/workflows/test.yml
@@ -54,7 +58,7 @@ jobs:
         python -c "import toml; d=toml.load('pyproject.toml'); d['project']['version']='${TEST_VERSION}'; toml.dump(d, open('pyproject.toml','w'))"
         echo "version=$TEST_VERSION" >> $GITHUB_OUTPUT
 
-    - name: Build and publish package
+    - name: Build and publish package with GitHub release
       uses: ./.github/actions/build-and-publish
       with:
         version: ${{ steps.version.outputs.version }}
@@ -63,64 +67,13 @@ jobs:
         twine-password: ${{ secrets.TEST_PYPI_API_TOKEN }}
         test-install: 'true'
         package-name: aif-workflow-helper
-
-    - name: Create repository archive
-      run: |
-        # Create a clean archive of the repository without .git directory
-        git archive --format=zip --output=aif-workflow-helper-${{ steps.version.outputs.version }}-source.zip HEAD
-
-    - name: Prepare release artifacts
-      run: |
-        # Ensure dist directory exists and contains our artifacts
-        ls -la dist/
-        ls -la *.zip
-        
-        # Create a release directory with all artifacts
-        mkdir -p release-artifacts
-        cp dist/*.whl release-artifacts/
-        cp dist/*.tar.gz release-artifacts/
-        cp *.zip release-artifacts/
-
-    - name: Create GitHub Release with gh CLI
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        # Create release notes
-        cat > release-notes.md << 'EOF'
-        ## Test Release v${{ steps.version.outputs.version }}
-        
-        This is an automated test release for validation purposes.
-        
-        ### Artifacts Included:
-        - 🐍 **Python Wheel**: Ready-to-install package
-        - 📦 **Source Distribution**: Complete package source  
-        - 📁 **Repository Archive**: Full source code snapshot
-        
-        ### Test PyPI Installation:
-        ```bash
-        pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ aif-workflow-helper==${{ steps.version.outputs.version }}
-        ```
-        
-        ### CLI Usage:
-        ```bash
-        aif-workflow-helper --help
-        ```
-        
-        > **Note**: This is a test release. For production releases, see the main releases.
-        EOF
-        
-        # Create the release with all artifacts
-        gh release create "test-v${{ steps.version.outputs.version }}" \
-          release-artifacts/*.whl \
-          release-artifacts/*.tar.gz \
-          release-artifacts/*.zip \
-          --title "Test Release v${{ steps.version.outputs.version }}" \
-          --notes-file release-notes.md \
-          --prerelease
+        create-release: 'true'
+        release-tag: test-v${{ steps.version.outputs.version }}
+        release-title: Test Release v${{ steps.version.outputs.version }}
+        prerelease: 'true'
+        github-token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Cleanup
       if: always()
       run: |
-        rm -rf dist/ test_env/ release-artifacts/
-        rm -f *.zip
         git checkout pyproject.toml || true

@@ -16,6 +16,10 @@ on:
           - minor
           - major
 
+permissions:
+  contents: write  # For creating releases
+  packages: write  # For publishing packages
+
 jobs:
   test:
     uses: ./.github/workflows/test.yml
@@ -105,32 +109,6 @@ jobs:
         git tag -a "v${{ steps.version.outputs.version }}" -m "Release v${{ steps.version.outputs.version }}"
         git push origin "v${{ steps.version.outputs.version }}"
 
-    - name: Create GitHub Release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: "v${{ steps.version.outputs.version }}"
-        release_name: "Release v${{ steps.version.outputs.version }}"
-        body: |
-          ## Changes in v${{ steps.version.outputs.version }}
-          
-          ${{ steps.changelog.outputs.changelog }}
-          
-          ## Installation
-          
-          ```bash
-          pip install aif-workflow-helper==${{ steps.version.outputs.version }}
-          ```
-          
-          ## CLI Usage
-          
-          ```bash
-          aif-workflow-helper --help
-          ```
-        draft: false
-        prerelease: false
-
   publish-pypi:
     needs: [test, create-release]
     runs-on: ubuntu-latest
@@ -141,12 +119,7 @@ jobs:
       with:
         ref: "v${{ needs.create-release.outputs.version }}"
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.12"
-
-    - name: Build and publish package
+    - name: Build, publish, and create GitHub release
       uses: ./.github/actions/build-and-publish
       with:
         version: ${{ needs.create-release.outputs.version }}
@@ -155,6 +128,12 @@ jobs:
         twine-password: ${{ secrets.PYPI_API_TOKEN }}
         test-install: 'true'
         package-name: aif-workflow-helper
+        create-release: 'true'
+        release-tag: v${{ needs.create-release.outputs.version }}
+        release-title: Release v${{ needs.create-release.outputs.version }}
+        changelog: ${{ needs.create-release.outputs.changelog }}
+        prerelease: 'false'
+        github-token: ${{ secrets.GITHUB_TOKEN }}
 
   update-main:
     needs: [create-release, publish-pypi]
