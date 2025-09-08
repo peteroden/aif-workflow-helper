@@ -64,8 +64,88 @@ jobs:
         test-install: 'true'
         package-name: aif-workflow-helper
 
+    - name: Create repository archive
+      run: |
+        # Create a clean archive of the repository without .git directory
+        git archive --format=zip --output=aif-workflow-helper-${{ steps.version.outputs.version }}-source.zip HEAD
+
+    - name: Prepare release artifacts
+      run: |
+        # Ensure dist directory exists and contains our artifacts
+        ls -la dist/
+        ls -la *.zip
+        
+        # Create a release directory with all artifacts
+        mkdir -p release-artifacts
+        cp dist/*.whl release-artifacts/
+        cp dist/*.tar.gz release-artifacts/
+        cp *.zip release-artifacts/
+
+    - name: Create GitHub Release
+      uses: actions/create-release@v1
+      id: create_release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: "test-v${{ steps.version.outputs.version }}"
+        release_name: "Test Release v${{ steps.version.outputs.version }}"
+        body: |
+          ## Test Release v${{ steps.version.outputs.version }}
+          
+          This is an automated test release for validation purposes.
+          
+          ### Artifacts Included:
+          - 🐍 **Python Wheel**: Ready-to-install package
+          - 📦 **Source Distribution**: Complete package source
+          - 📁 **Repository Archive**: Full source code snapshot
+          
+          ### Test PyPI Installation:
+          ```bash
+          pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ aif-workflow-helper==${{ steps.version.outputs.version }}
+          ```
+          
+          ### CLI Usage:
+          ```bash
+          aif-workflow-helper --help
+          ```
+          
+          > **Note**: This is a test release. For production releases, see the main releases.
+        draft: false
+        prerelease: true
+
+    - name: Upload Python Wheel
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./release-artifacts/aif_workflow_helper-${{ steps.version.outputs.version }}-py3-none-any.whl
+        asset_name: aif_workflow_helper-${{ steps.version.outputs.version }}-py3-none-any.whl
+        asset_content_type: application/zip
+
+    - name: Upload Source Distribution
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./release-artifacts/aif-workflow-helper-${{ steps.version.outputs.version }}.tar.gz
+        asset_name: aif-workflow-helper-${{ steps.version.outputs.version }}.tar.gz
+        asset_content_type: application/gzip
+
+    - name: Upload Repository Archive
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./release-artifacts/aif-workflow-helper-${{ steps.version.outputs.version }}-source.zip
+        asset_name: aif-workflow-helper-${{ steps.version.outputs.version }}-source.zip
+        asset_content_type: application/zip
+
     - name: Cleanup
       if: always()
       run: |
-        rm -rf dist/ test_env/
+        rm -rf dist/ test_env/ release-artifacts/
+        rm -f *.zip
         git checkout pyproject.toml || true
