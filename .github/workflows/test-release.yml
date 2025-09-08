@@ -1,3 +1,4 @@
+# Example: Updated test-release.yml workflow
 name: Test Release
 
 on:
@@ -12,10 +13,6 @@ on:
           - patch
           - minor
           - major
-
-permissions:
-  contents: write  # For creating releases
-  packages: write  # For publishing packages
 
 jobs:
   test:
@@ -58,20 +55,34 @@ jobs:
         python -c "import toml; d=toml.load('pyproject.toml'); d['project']['version']='${TEST_VERSION}'; toml.dump(d, open('pyproject.toml','w'))"
         echo "version=$TEST_VERSION" >> $GITHUB_OUTPUT
 
-    - name: Build and publish package with GitHub release
-      uses: ./.github/actions/build-and-publish
+    # 1. Build the package
+    - name: Build package
+      uses: ./.github/actions/build-python-package
+      with:
+        version: ${{ steps.version.outputs.version }}
+        package-name: aif-workflow-helper
+
+    # 2. Publish to TestPyPI
+    - name: Publish to TestPyPI
+      uses: ./.github/actions/publish-python-package
       with:
         version: ${{ steps.version.outputs.version }}
         repository: testpypi
         twine-username: __token__
         twine-password: ${{ secrets.TEST_PYPI_API_TOKEN }}
-        test-install: 'true'
         package-name: aif-workflow-helper
-        create-release: 'true'
+        test-install: 'true'
+
+    # 3. Create GitHub release
+    - name: Create test release
+      uses: ./.github/actions/create-github-release
+      with:
         release-tag: test-v${{ steps.version.outputs.version }}
         release-title: Test Release v${{ steps.version.outputs.version }}
-        prerelease: 'true'
         github-token: ${{ secrets.GITHUB_TOKEN }}
+        package-name: aif-workflow-helper
+        version: ${{ steps.version.outputs.version }}
+        prerelease: 'true'
 
     - name: Cleanup
       if: always()
