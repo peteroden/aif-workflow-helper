@@ -45,7 +45,7 @@
 	// "forwardPorts": [],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "gh extension install https://github.com/nektos/gh-act && pip install --user -r requirements.txt",
+	"postCreateCommand": "gh extension install https://github.com/nektos/gh-act || echo 'Warning: gh-act extension failed to install' && pip install --user -r requirements.txt",
 
 	// Configure tool-specific properties.
 	"customizations": {
