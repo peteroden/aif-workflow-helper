@@ -38,6 +38,26 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - name: Install GitHub CLI (if needed)
+      shell: bash
+      run: |
+        if ! command -v gh &> /dev/null; then
+          echo "📦 Installing GitHub CLI..."
+          if [ -f /etc/debian_version ]; then
+            # Debian/Ubuntu
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt update
+            sudo apt install gh
+          else
+            echo "❌ Unsupported OS for GitHub CLI installation"
+            exit 1
+          fi
+          echo "✅ GitHub CLI installed"
+        else
+          echo "✅ GitHub CLI already available"
+        fi
+
     - name: Validate inputs
       shell: bash
       run: |

@@ -21,75 +21,17 @@ permissions:
   packages: write  # For publishing packages
 
 jobs:
-  test:
-    uses: ./.github/workflows/test.yml
+  release:
+    uses: ./.github/workflows/shared-release.yml
     with:
-      fetch-depth: 0
-      coverage: false
-
-  create-release:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    outputs:
-      version: ${{ steps.version.outputs.new_version }}
-      changelog: ${{ steps.version.outputs.changelog }}
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        token: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.12"
-
-    - name: Manage version (production mode)
-      id: version
-      uses: ./.github/actions/manage-version
-      with:
-        version_bump: ${{ github.event.inputs.version_bump }}
-        is_test: 'false'
-        commit_strategy: 'tag_only'
-
-  publish-pypi:
-    needs: [test, create-release]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        ref: "v${{ needs.create-release.outputs.version }}"
-
-    # 1. Build the package
-    - name: Build package
-      uses: ./.github/actions/build-python-package
-      with:
-        version: ${{ needs.create-release.outputs.version }}
-        package-name: aif-workflow-helper
-
-    # 2. Create GitHub release
-    - name: Create production release
-      uses: ./.github/actions/create-github-release
-      with:
-        release-tag: v${{ needs.create-release.outputs.version }}
-        release-title: Release v${{ needs.create-release.outputs.version }}
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        package-name: aif-workflow-helper
-        version: ${{ needs.create-release.outputs.version }}
-        changelog: ${{ needs.create-release.outputs.changelog }}
-        prerelease: 'false'
-
-    # 3. Publish to PyPI
-    - name: Publish to PyPI
-      uses: ./.github/actions/publish-python-package
-      with:
-        version: ${{ needs.create-release.outputs.version }}
-        repository: pypi
-        twine-username: __token__
-        twine-password: ${{ secrets.PYPI_API_TOKEN }}
-        package-name: aif-workflow-helper
-        test-install: 'true'
+      version_bump: ${{ github.event.inputs.version_bump }}
+      is_test: false
+      repository: 'pypi'
+      release_prefix: 'v'
+      release_title_prefix: 'Release v'
+      prerelease: false
+      create_release: true
+      commit_strategy: 'tag_only'
+      branch_condition: 'refs/heads/main'
+    secrets:
+      api_token: ${{ secrets.PYPI_API_TOKEN }}

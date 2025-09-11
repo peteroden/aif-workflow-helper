@@ -15,79 +15,17 @@ on:
           - major
 
 jobs:
-  test:
-    uses: ./.github/workflows/test.yml
-    with:
-      fetch-depth: 0
-      coverage: false
-
   test-release:
-    needs: test
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        token: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.12"
-
-    - name: Install uv and supporting tools
-      run: |
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
-        uv pip install --system toml
-
-    - name: Create test version (no commit)
-      id: version
-      run: |
-        set -e
-        CURRENT_VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
-        echo "Current version: $CURRENT_VERSION"
-        TIMESTAMP=$(date +%Y%m%d%H%M%S)
-        TEST_VERSION="${CURRENT_VERSION}.dev${TIMESTAMP}"
-        echo "Test version: $TEST_VERSION"
-        python -c "import toml; d=toml.load('pyproject.toml'); d['project']['version']='${TEST_VERSION}'; toml.dump(d, open('pyproject.toml','w'))"
-        echo "version=$TEST_VERSION" >> $GITHUB_OUTPUT
-
-    # 1. Build the package
-    - name: Build package
-      uses: ./.github/actions/build-python-package
-      with:
-        version: ${{ steps.version.outputs.version }}
-        package-name: aif-workflow-helper
-
-    # 2. Create GitHub test release
-    - name: Create test release
-      if: ${{ !cancelled() }}  # Always run unless workflow was cancelled
-      uses: ./.github/actions/create-github-release
-      with:
-        release-tag: test-v${{ steps.version.outputs.version }}
-        release-title: "🧪 Test Release v${{ steps.version.outputs.version }}"
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        package-name: aif-workflow-helper
-        version: ${{ steps.version.outputs.version }}
-        changelog: "Generated from test workflow"
-        prerelease: 'true'
-
-    # 3. Publish to TestPyPI
-    - name: Publish to TestPyPI
-      uses: ./.github/actions/publish-python-package
-      with:
-        version: ${{ steps.version.outputs.version }}
-        repository: testpypi
-        twine-username: __token__
-        twine-password: ${{ secrets.TEST_PYPI_API_TOKEN }}
-        package-name: aif-workflow-helper
-        test-install: 'true'
-      continue-on-error: true
-
-    - name: Cleanup
-      if: always()
-      run: |
-        git checkout pyproject.toml || true
+    uses: ./.github/workflows/shared-release.yml
+    with:
+      version_bump: ${{ github.event.inputs.version_bump }}
+      is_test: true
+      repository: 'testpypi'
+      release_prefix: 'test-v'
+      release_title_prefix: '🧪 Test Release v'
+      prerelease: true
+      create_release: false
+      commit_strategy: 'none'
+      branch_condition: 'true'
+    secrets:
+      api_token: ${{ secrets.TEST_PYPI_API_TOKEN }}
