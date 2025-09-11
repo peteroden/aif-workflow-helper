@@ -114,7 +114,7 @@ runs:
         
         # Build changelog section
         CHANGES_SECTION=""
-        if [ -n "${{ inputs.changelog }}" ] && [ "${{ inputs.prerelease }}" != "true" ]; then
+        if [ -n "${{ inputs.changelog }}" ] && [ "${{ inputs.prerelease }}" = "false" ]; then
           CHANGES_SECTION="### Changes in ${{ inputs.version }}
 
         ${{ inputs.changelog }}
