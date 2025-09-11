@@ -1,3 +1,4 @@
+# Example: Updated test-release.yml workflow
 name: Test Release
 
 on:
@@ -14,58 +15,17 @@ on:
           - major
 
 jobs:
-  test:
-    uses: ./.github/workflows/test.yml
-    with:
-      fetch-depth: 0
-      coverage: false
-
   test-release:
-    needs: test
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        token: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.12"
-
-    - name: Install uv and supporting tools
-      run: |
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
-        uv pip install --system toml
-
-    - name: Create test version (no commit)
-      id: version
-      run: |
-        set -e
-        CURRENT_VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
-        echo "Current version: $CURRENT_VERSION"
-        TIMESTAMP=$(date +%Y%m%d%H%M%S)
-        TEST_VERSION="${CURRENT_VERSION}.dev${TIMESTAMP}"
-        echo "Test version: $TEST_VERSION"
-        python -c "import toml; d=toml.load('pyproject.toml'); d['project']['version']='${TEST_VERSION}'; toml.dump(d, open('pyproject.toml','w'))"
-        echo "version=$TEST_VERSION" >> $GITHUB_OUTPUT
-
-    - name: Build and publish package
-      uses: ./.github/actions/build-and-publish
-      with:
-        version: ${{ steps.version.outputs.version }}
-        repository: testpypi
-        twine-username: __token__
-        twine-password: ${{ secrets.TEST_PYPI_API_TOKEN }}
-        test-install: 'true'
-        package-name: aif-workflow-helper
-
-    - name: Cleanup
-      if: always()
-      run: |
-        rm -rf dist/ test_env/
-        git checkout pyproject.toml || true
+    uses: ./.github/workflows/shared-release.yml
+    with:
+      version_bump: ${{ github.event.inputs.version_bump }}
+      is_test: true
+      repository: 'testpypi'
+      release_prefix: 'test-v'
+      release_title_prefix: '🧪 Test Release v'
+      prerelease: true
+      create_release: false
+      commit_strategy: 'none'
+      branch_condition: 'true'
+    secrets:
+      api_token: ${{ secrets.TEST_PYPI_API_TOKEN }}

@@ -14,7 +14,7 @@ export PROJECT_ENDPOINT='your-ai-foundry-endpoint-here'
 **Example:**
 
 ```bash
-export AZURE_TENANT_ID='16b3c013-d300-468d-ac64-7eda0820b6d3'
+export AZURE_TENANT_ID='aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 export PROJECT_ENDPOINT='https://your-resource.services.ai.azure.com/api/projects/your-project'
 ```
 

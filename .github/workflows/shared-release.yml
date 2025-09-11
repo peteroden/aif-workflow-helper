@@ -1,0 +1,124 @@
+name: Shared Release Workflow
+
+on:
+  workflow_call:
+    inputs:
+      version_bump:
+        description: 'Version bump type'
+        required: true
+        type: string
+      is_test:
+        description: 'Whether this is a test release'
+        required: true
+        type: boolean
+      repository:
+        description: 'PyPI repository (pypi or testpypi)'
+        required: true
+        type: string
+      release_prefix:
+        description: 'Prefix for release tag (v or test-v)'
+        required: true
+        type: string
+      release_title_prefix:
+        description: 'Prefix for release title'
+        required: false
+        default: 'Release'
+        type: string
+      prerelease:
+        description: 'Mark release as prerelease'
+        required: false
+        default: false
+        type: boolean
+      create_release:
+        description: 'Whether to create a GitHub release'
+        required: false
+        default: true
+        type: boolean
+      commit_strategy:
+        description: 'Version commit strategy'
+        required: false
+        type: string
+        default: 'none'
+      branch_condition:
+        description: 'Branch condition for release job'
+        required: false
+        type: string
+        default: 'true'
+    secrets:
+      api_token:
+        description: 'PyPI/TestPyPI API token'
+        required: true
+    outputs:
+      version:
+        description: 'The version that was released'
+        value: ${{ jobs.release.outputs.version }}
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+    with:
+      fetch-depth: 0
+      coverage: false
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    if: ${{ inputs.branch_condition == 'true' || (inputs.branch_condition != 'true' && github.ref == inputs.branch_condition) }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.12"
+
+    - name: Create version
+      id: version
+      uses: ./.github/actions/create-version
+      with:
+        version_bump: ${{ inputs.version_bump }}
+        is_test: ${{ inputs.is_test }}
+        commit_strategy: ${{ inputs.commit_strategy }}
+
+    # 1. Build the package
+    - name: Build package
+      uses: ./.github/actions/build-python-package
+      with:
+        version: ${{ steps.version.outputs.version }}
+        package-name: aif-workflow-helper
+
+    # 2. Create GitHub release
+    - name: Create release
+      if: ${{ inputs.create_release && !cancelled() }}  # Only run if create_release is true and workflow wasn't cancelled
+      uses: ./.github/actions/create-github-release
+      with:
+        release-tag: ${{ inputs.release_prefix }}${{ steps.version.outputs.version }}
+        release-title: "${{ inputs.release_title_prefix }}${{ steps.version.outputs.version }}"
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        package-name: aif-workflow-helper
+        version: ${{ steps.version.outputs.version }}
+        changelog: ${{ steps.version.outputs.changelog }}
+        prerelease: ${{ inputs.prerelease }}
+
+    # 3. Publish to PyPI/TestPyPI
+    - name: Publish to ${{ inputs.repository }}
+      uses: ./.github/actions/publish-python-package
+      with:
+        version: ${{ steps.version.outputs.version }}
+        repository: ${{ inputs.repository }}
+        twine-username: __token__
+        twine-password: ${{ secrets.api_token }}
+        package-name: aif-workflow-helper
+        test-install: 'true'
+      continue-on-error: ${{ inputs.is_test }}
+
+    # 4. Cleanup (only for test releases)
+    - name: Cleanup
+      if: ${{ inputs.is_test && always() }}
+      run: |
+        git checkout pyproject.toml || true

@@ -16,166 +16,22 @@ on:
           - minor
           - major
 
+permissions:
+  contents: write  # For creating releases
+  packages: write  # For publishing packages
+
 jobs:
-  test:
-    uses: ./.github/workflows/test.yml
+  release:
+    uses: ./.github/workflows/shared-release.yml
     with:
-      fetch-depth: 0
-      coverage: false
-
-  create-release:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      changelog: ${{ steps.changelog.outputs.changelog }}
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        token: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.12"
-
-    - name: Install uv and dependencies
-      run: |
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
-        uv pip install --system bump2version toml
-
-    - name: Configure Git
-      run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-
-    - name: Get current version
-      id: current_version
-      run: |
-        CURRENT_VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
-        echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-
-    - name: Determine version bump
-      id: version_bump
-      run: |
-        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-          echo "type=${{ github.event.inputs.version_bump }}" >> $GITHUB_OUTPUT
-        else
-          # Auto-determine based on commit messages
-          if git log --oneline $(git describe --tags --abbrev=0)..HEAD | grep -i "breaking\|major"; then
-            echo "type=major" >> $GITHUB_OUTPUT
-          elif git log --oneline $(git describe --tags --abbrev=0)..HEAD | grep -i "feat\|feature\|minor"; then
-            echo "type=minor" >> $GITHUB_OUTPUT
-          else
-            echo "type=patch" >> $GITHUB_OUTPUT
-          fi
-        fi
-
-    - name: Bump version
-      id: version
-      run: |
-        bump2version ${{ steps.version_bump.outputs.type }} --verbose
-        NEW_VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
-        echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
-
-    - name: Generate changelog
-      id: changelog
-      run: |
-        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
-        if [ -z "$PREVIOUS_TAG" ]; then
-          CHANGELOG=$(git log --pretty=format:"- %s" --reverse)
-        else
-          CHANGELOG=$(git log --pretty=format:"- %s" ${PREVIOUS_TAG}..HEAD --reverse)
-        fi
-        
-        # Save changelog to file and output
-        echo "$CHANGELOG" > changelog.txt
-        {
-          echo "changelog<<EOF"
-          cat changelog.txt
-          echo "EOF"
-        } >> $GITHUB_OUTPUT
-
-    - name: Create Git tag
-      run: |
-        git tag -a "v${{ steps.version.outputs.version }}" -m "Release v${{ steps.version.outputs.version }}"
-        git push origin "v${{ steps.version.outputs.version }}"
-
-    - name: Create GitHub Release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: "v${{ steps.version.outputs.version }}"
-        release_name: "Release v${{ steps.version.outputs.version }}"
-        body: |
-          ## Changes in v${{ steps.version.outputs.version }}
-          
-          ${{ steps.changelog.outputs.changelog }}
-          
-          ## Installation
-          
-          ```bash
-          pip install aif-workflow-helper==${{ steps.version.outputs.version }}
-          ```
-          
-          ## CLI Usage
-          
-          ```bash
-          aif-workflow-helper --help
-          ```
-        draft: false
-        prerelease: false
-
-  publish-pypi:
-    needs: [test, create-release]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        ref: "v${{ needs.create-release.outputs.version }}"
-
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.12"
-
-    - name: Build and publish package
-      uses: ./.github/actions/build-and-publish
-      with:
-        version: ${{ needs.create-release.outputs.version }}
-        repository: pypi
-        twine-username: __token__
-        twine-password: ${{ secrets.PYPI_API_TOKEN }}
-        test-install: 'true'
-        package-name: aif-workflow-helper
-
-  update-main:
-    needs: [create-release, publish-pypi]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        token: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Configure Git
-      run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-
-    - name: Pull latest changes with version bump
-      run: |
-        git pull origin main
-
-    - name: Push version bump to main
-      run: |
-        git push origin main
+      version_bump: ${{ github.event.inputs.version_bump }}
+      is_test: false
+      repository: 'pypi'
+      release_prefix: 'v'
+      release_title_prefix: 'Release v'
+      prerelease: false
+      create_release: true
+      commit_strategy: 'tag_only'
+      branch_condition: 'refs/heads/main'
+    secrets:
+      api_token: ${{ secrets.PYPI_API_TOKEN }}

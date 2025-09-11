@@ -1,0 +1,94 @@
+name: 'Build Python Package'
+description: 'Build and validate Python package with uv'
+
+inputs:
+  version:
+    description: 'Package version to build'
+    required: true
+  package-name:
+    description: 'Package name for validation'
+    required: false
+    default: 'aif-workflow-helper'
+
+outputs:
+  wheel-path:
+    description: 'Path to built wheel file'
+    value: ${{ steps.build.outputs.wheel-path }}
+  sdist-path:
+    description: 'Path to built source distribution'
+    value: ${{ steps.build.outputs.sdist-path }}
+  dist-dir:
+    description: 'Directory containing built artifacts'
+    value: 'dist'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install uv and supporting tools
+      shell: bash
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        uv pip install --system toml
+
+    - name: Build package
+      id: build
+      shell: bash
+      run: |
+        uv build
+        echo "wheel-path=$(ls dist/*.whl | head -n1)" >> $GITHUB_OUTPUT
+        echo "sdist-path=$(ls dist/*.tar.gz | head -n1)" >> $GITHUB_OUTPUT
+
+    - name: Validate artifacts
+      shell: bash
+      run: |
+        set -e
+        echo "📦 Built artifacts:"
+        ls -la dist/
+        
+        echo "🔍 Validating with twine..."
+        uvx twine check dist/*
+        
+        echo "📋 Package contents:"
+        WHEEL=$(ls dist/*.whl | head -n1)
+        python -c "
+        import zipfile, glob
+        w = glob.glob('dist/*.whl')[0]
+        z = zipfile.ZipFile(w)
+        print('Wheel contents:')
+        for name in sorted(z.namelist())[:20]:
+            print(f'  {name}')
+        if len(z.namelist()) > 20:
+            print(f'  ... and {len(z.namelist()) - 20} more files')
+        "
+        
+        echo "✅ Version validation:"
+        case "$WHEEL" in 
+          *"${{ inputs.version }}"*) 
+            echo "Version ${{ inputs.version }} found in wheel filename"
+            ;;
+          *) 
+            echo "ERROR: Version ${{ inputs.version }} not found in wheel: $WHEEL"
+            exit 1
+            ;;
+        esac
+
+    - name: Test local installation
+      shell: bash
+      run: |
+        echo "🧪 Testing local installation..."
+        uv pip install --system dist/*.whl
+        
+        echo "🔧 Testing CLI..."
+        ${{ inputs.package-name }} --help | head -n 2
+        
+        echo "📚 Testing imports..."
+        python -c "
+        try:
+            import aif_workflow_helper.utils.logging as lg
+            import aif_workflow_helper.core.upload as up
+            print(f'✅ Imports successful: {lg.logger.name}, {up.__name__}')
+        except ImportError as e:
+            print(f'❌ Import failed: {e}')
+            exit(1)
+        "
