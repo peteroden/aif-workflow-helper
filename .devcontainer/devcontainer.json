@@ -37,14 +37,15 @@
 		},
 		"ghcr.io/azure/azure-dev/azd:0": {
 			"version": "stable"
-		}
+		},
+		"ghcr.io/devcontainers/features/github-cli:1": {}
 	},
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	// "postCreateCommand": "pip3 install --user -r requirements.txt",
+	"postCreateCommand": "gh extension install https://github.com/nektos/gh-act && pip install --user -r requirements.txt",
 
 	// Configure tool-specific properties.
 	"customizations": {

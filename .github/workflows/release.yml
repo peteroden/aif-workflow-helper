@@ -32,8 +32,8 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     outputs:
-      version: ${{ steps.version.outputs.version }}
-      changelog: ${{ steps.changelog.outputs.changelog }}
+      version: ${{ steps.version.outputs.new_version }}
+      changelog: ${{ steps.version.outputs.changelog }}
 
     steps:
     - uses: actions/checkout@v4
@@ -46,68 +46,13 @@ jobs:
       with:
         python-version: "3.12"
 
-    - name: Install uv and dependencies
-      run: |
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
-        uv pip install --system bump2version toml
-
-    - name: Configure Git
-      run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-
-    - name: Get current version
-      id: current_version
-      run: |
-        CURRENT_VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
-        echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-
-    - name: Determine version bump
-      id: version_bump
-      run: |
-        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-          echo "type=${{ github.event.inputs.version_bump }}" >> $GITHUB_OUTPUT
-        else
-          # Auto-determine based on commit messages
-          if git log --oneline $(git describe --tags --abbrev=0)..HEAD | grep -i "breaking\|major"; then
-            echo "type=major" >> $GITHUB_OUTPUT
-          elif git log --oneline $(git describe --tags --abbrev=0)..HEAD | grep -i "feat\|feature\|minor"; then
-            echo "type=minor" >> $GITHUB_OUTPUT
-          else
-            echo "type=patch" >> $GITHUB_OUTPUT
-          fi
-        fi
-
-    - name: Bump version
+    - name: Manage version (production mode)
       id: version
-      run: |
-        bump2version ${{ steps.version_bump.outputs.type }} --verbose
-        NEW_VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
-        echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
-
-    - name: Generate changelog
-      id: changelog
-      run: |
-        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
-        if [ -z "$PREVIOUS_TAG" ]; then
-          CHANGELOG=$(git log --pretty=format:"- %s" --reverse)
-        else
-          CHANGELOG=$(git log --pretty=format:"- %s" ${PREVIOUS_TAG}..HEAD --reverse)
-        fi
-        
-        # Save changelog to file and output
-        echo "$CHANGELOG" > changelog.txt
-        {
-          echo "changelog<<EOF"
-          cat changelog.txt
-          echo "EOF"
-        } >> $GITHUB_OUTPUT
-
-    - name: Create Git tag
-      run: |
-        git tag -a "v${{ steps.version.outputs.version }}" -m "Release v${{ steps.version.outputs.version }}"
-        git push origin "v${{ steps.version.outputs.version }}"
+      uses: ./.github/actions/manage-version
+      with:
+        version_bump: ${{ github.event.inputs.version_bump }}
+        is_test: 'false'
+        commit_strategy: 'tag_only'
 
   publish-pypi:
     needs: [test, create-release]
@@ -126,18 +71,7 @@ jobs:
         version: ${{ needs.create-release.outputs.version }}
         package-name: aif-workflow-helper
 
-    # 2. Publish to PyPI
-    - name: Publish to PyPI
-      uses: ./.github/actions/publish-python-package
-      with:
-        version: ${{ needs.create-release.outputs.version }}
-        repository: pypi
-        twine-username: __token__
-        twine-password: ${{ secrets.PYPI_API_TOKEN }}
-        package-name: aif-workflow-helper
-        test-install: 'true'
-
-    # 3. Create GitHub release
+    # 2. Create GitHub release
     - name: Create production release
       uses: ./.github/actions/create-github-release
       with:
@@ -148,3 +82,14 @@ jobs:
         version: ${{ needs.create-release.outputs.version }}
         changelog: ${{ needs.create-release.outputs.changelog }}
         prerelease: 'false'
+
+    # 3. Publish to PyPI
+    - name: Publish to PyPI
+      uses: ./.github/actions/publish-python-package
+      with:
+        version: ${{ needs.create-release.outputs.version }}
+        repository: pypi
+        twine-username: __token__
+        twine-password: ${{ secrets.PYPI_API_TOKEN }}
+        package-name: aif-workflow-helper
+        test-install: 'true'

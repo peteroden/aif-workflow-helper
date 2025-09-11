@@ -62,7 +62,20 @@ jobs:
         version: ${{ steps.version.outputs.version }}
         package-name: aif-workflow-helper
 
-    # 2. Publish to TestPyPI
+    # 2. Create GitHub test release
+    - name: Create test release
+      if: ${{ !cancelled() }}  # Always run unless workflow was cancelled
+      uses: ./.github/actions/create-github-release
+      with:
+        release-tag: test-v${{ steps.version.outputs.version }}
+        release-title: "🧪 Test Release v${{ steps.version.outputs.version }}"
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        package-name: aif-workflow-helper
+        version: ${{ steps.version.outputs.version }}
+        changelog: "Generated from test workflow"
+        prerelease: 'true'
+
+    # 3. Publish to TestPyPI
     - name: Publish to TestPyPI
       uses: ./.github/actions/publish-python-package
       with:
@@ -72,17 +85,7 @@ jobs:
         twine-password: ${{ secrets.TEST_PYPI_API_TOKEN }}
         package-name: aif-workflow-helper
         test-install: 'true'
-
-    # 3. Create GitHub release
-    - name: Create test release
-      uses: ./.github/actions/create-github-release
-      with:
-        release-tag: test-v${{ steps.version.outputs.version }}
-        release-title: Test Release v${{ steps.version.outputs.version }}
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        package-name: aif-workflow-helper
-        version: ${{ steps.version.outputs.version }}
-        prerelease: 'true'
+      continue-on-error: true
 
     - name: Cleanup
       if: always()

@@ -1,0 +1,155 @@
+name: 'Manage Version'
+description: 'Handle version bumping and validation for both test and production releases'
+
+inputs:
+  version_bump:
+    description: 'Version bump type (patch, minor, major)'
+    required: true
+  is_test:
+    description: 'Whether this is a test release (creates .dev version)'
+    required: false
+    default: 'false'
+  commit_strategy:
+    description: 'Version commit strategy: commit_and_tag, tag_only, or none'
+    required: false
+    default: 'tag_only'
+
+outputs:
+  current_version:
+    description: 'The current version before any changes'
+    value: ${{ steps.get_current.outputs.version }}
+  new_version:
+    description: 'The new version after bumping'
+    value: ${{ steps.bump_version.outputs.version }}
+  changelog:
+    description: 'Generated changelog'
+    value: ${{ steps.generate_changelog.outputs.changelog }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install uv and dependencies
+      shell: bash
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        uv pip install --system bump2version toml
+
+    - name: Configure Git
+      if: inputs.commit_strategy != 'none'
+      shell: bash
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: Get current version
+      id: get_current
+      shell: bash
+      run: |
+        CURRENT_VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
+        echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        echo "📌 Current version: $CURRENT_VERSION"
+
+    - name: Determine version bump type
+      id: determine_bump
+      shell: bash
+      run: |
+        # For workflow_dispatch, use the provided input
+        # For other triggers, auto-determine based on commit messages
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          echo "type=${{ inputs.version_bump }}" >> $GITHUB_OUTPUT
+        else
+          if git log --oneline $(git describe --tags --abbrev=0)..HEAD | grep -i "breaking\|major"; then
+            echo "type=major" >> $GITHUB_OUTPUT
+          elif git log --oneline $(git describe --tags --abbrev=0)..HEAD | grep -i "feat\|feature\|minor"; then
+            echo "type=minor" >> $GITHUB_OUTPUT
+          else
+            echo "type=patch" >> $GITHUB_OUTPUT
+          fi
+        fi
+
+    - name: Bump version
+      id: bump_version
+      shell: bash
+      run: |
+        if [[ "${{ inputs.is_test }}" == "true" ]]; then
+          # For test releases, create a dev version without committing
+          echo "🧪 Creating test version..."
+          CURRENT_VERSION="${{ steps.get_current.outputs.version }}"
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          TEST_VERSION="${CURRENT_VERSION}.dev${TIMESTAMP}"
+          
+          # Temporarily modify pyproject.toml for building
+          python -c "
+          import toml
+          config = toml.load('pyproject.toml')
+          config['project']['version'] = '${TEST_VERSION}'
+          with open('pyproject.toml', 'w') as f:
+              toml.dump(config, f)
+          "
+          echo "version=$TEST_VERSION" >> $GITHUB_OUTPUT
+          echo "✅ Test version: $TEST_VERSION"
+        else
+          # For production releases, handle based on commit strategy
+          echo "🚀 Bumping version for production release..."
+          case "${{ inputs.commit_strategy }}" in
+            "commit_and_tag")
+              echo "📝 Using commit_and_tag strategy"
+              bump2version ${{ steps.determine_bump.outputs.type }} --verbose
+              ;;
+            "tag_only")
+              echo "🏷️ Using tag_only strategy (recommended)"
+              bump2version ${{ steps.determine_bump.outputs.type }} --no-commit --no-tag --verbose
+              ;;
+            "none")
+              echo "🔧 Using none strategy (dry run)"
+              bump2version ${{ steps.determine_bump.outputs.type }} --no-commit --no-tag --verbose
+              ;;
+          esac
+          
+          NEW_VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "✅ New version: $NEW_VERSION"
+        fi
+
+    - name: Generate changelog
+      id: generate_changelog
+      shell: bash
+      run: |
+        echo "📝 Generating changelog..."
+        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+        if [ -z "$PREVIOUS_TAG" ]; then
+          CHANGELOG=$(git log --pretty=format:"- %s" --reverse --max-count=10)
+        else
+          CHANGELOG=$(git log --pretty=format:"- %s" ${PREVIOUS_TAG}..HEAD --reverse)
+        fi
+        
+        echo "$CHANGELOG" > changelog.txt
+        echo "📋 Changelog preview:"
+        cat changelog.txt
+        
+        {
+          echo "changelog<<EOF"
+          cat changelog.txt
+          echo "EOF"
+        } >> $GITHUB_OUTPUT
+
+    - name: Create Git tag and commit (if needed)
+      if: inputs.commit_strategy != 'none' && inputs.is_test == 'false'
+      shell: bash
+      run: |
+        case "${{ inputs.commit_strategy }}" in
+          "commit_and_tag")
+            echo "📝 Version was already committed by bump2version"
+            echo "🏷️ Creating and pushing tag..."
+            git tag -a "v${{ steps.bump_version.outputs.version }}" -m "Release v${{ steps.bump_version.outputs.version }}"
+            git push origin "v${{ steps.bump_version.outputs.version }}"
+            ;;
+          "tag_only")
+            echo "🏷️ Creating tag without version commit (recommended approach)..."
+            git tag -a "v${{ steps.bump_version.outputs.version }}" -m "Release v${{ steps.bump_version.outputs.version }}"
+            git push origin "v${{ steps.bump_version.outputs.version }}"
+            echo "ℹ️ Version files updated but not committed - this is intentional"
+            echo "ℹ️ Tag points to the actual feature commit, keeping history clean"
+            ;;
+        esac
