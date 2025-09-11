@@ -1,4 +1,4 @@
-name: 'Unified Version Management'
+name: 'Create Version'
 description: 'Handles both test and production version creation'
 
 inputs:
@@ -50,7 +50,7 @@ runs:
     - name: Create production version
       if: inputs.is_test == 'false'
       id: prod-version
-      uses: ./.github/actions/manage-version
+      uses: ./.github/actions/bump-version
       with:
         version_bump: ${{ inputs.version_bump }}
         is_test: 'false'

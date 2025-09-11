@@ -1,4 +1,4 @@
-name: 'Manage Version'
+name: 'Bump Version'
 description: 'Handle version bumping and validation for both test and production releases'
 
 inputs:

@@ -79,7 +79,7 @@ jobs:
 
     - name: Create version
       id: version
-      uses: ./.github/actions/version-management
+      uses: ./.github/actions/create-version
       with:
         version_bump: ${{ inputs.version_bump }}
         is_test: ${{ inputs.is_test }}
