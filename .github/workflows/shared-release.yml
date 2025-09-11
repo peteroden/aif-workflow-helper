@@ -63,7 +63,7 @@ jobs:
   release:
     needs: test
     runs-on: ubuntu-latest
-    if: ${{ inputs.branch_condition == 'true' || github.ref == inputs.branch_condition }}
+    if: ${{ inputs.branch_condition == 'true' || (inputs.branch_condition != 'true' && github.ref == inputs.branch_condition) }}
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:

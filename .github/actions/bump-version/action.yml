@@ -59,9 +59,15 @@ runs:
         if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
           echo "type=${{ inputs.version_bump }}" >> $GITHUB_OUTPUT
         else
-          if git log --oneline $(git describe --tags --abbrev=0)..HEAD | grep -i "breaking\|major"; then
+          # Check if any tags exist
+          if git tag --list | grep . >/dev/null; then
+            TAG_RANGE="$(git describe --tags --abbrev=0)..HEAD"
+          else
+            TAG_RANGE=""
+          fi
+          if git log --oneline $TAG_RANGE | grep -i "breaking\|major"; then
             echo "type=major" >> $GITHUB_OUTPUT
-          elif git log --oneline $(git describe --tags --abbrev=0)..HEAD | grep -i "feat\|feature\|minor"; then
+          elif git log --oneline $TAG_RANGE | grep -i "feat\|feature\|minor"; then
             echo "type=minor" >> $GITHUB_OUTPUT
           else
             echo "type=patch" >> $GITHUB_OUTPUT
