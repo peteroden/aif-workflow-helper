@@ -59,6 +59,9 @@ aif-workflow-helper --upload-all-agents --agents-dir agents
 # Upload a single agent definition file
 aif-workflow-helper --upload-agent my_agent --agents-dir agents
 
+# Get the agent ID for a specific agent by name
+aif-workflow-helper --get-agent-id my_agent
+
 # Download agents in different formats
 aif-workflow-helper --download-all-agents --format json     # Default
 aif-workflow-helper --download-all-agents --format yaml     # YAML format
@@ -79,6 +82,10 @@ aif-workflow-helper --download-all-agents \
 # Mix CLI parameters with environment variables (CLI takes precedence)
 export AZURE_TENANT_ID="env-tenant-id"
 aif-workflow-helper --download-all-agents --azure-tenant-id "cli-tenant-id"  # Uses CLI value
+
+# Get agent ID and use in scripts
+AGENT_ID=$(aif-workflow-helper --get-agent-id my_agent)
+echo "Agent ID: $AGENT_ID"
 ```
 
 ### 4. Direct Library Usage
@@ -86,7 +93,7 @@ aif-workflow-helper --download-all-agents --azure-tenant-id "cli-tenant-id"  # U
 You can import and compose the underlying functions directly:
 
 ```python
-from aif_workflow_helpers import (
+from aif_workflow_helper import (
     configure_logging,
     download_agents,
     download_agent,
@@ -157,6 +164,7 @@ create_or_update_agents_from_files(path="./agents", agent_client=client, prefix=
 --download-agent NAME           Download a single agent by name
 --upload-all-agents             Create/update all agents from definition files
 --upload-agent NAME             Create/update a single agent from definition file
+--get-agent-id NAME             Get the agent ID for a given agent name
 --prefix TEXT                   Optional prefix applied during download/upload
 --suffix TEXT                   Optional suffix applied during download/upload
 --format FORMAT                 File format: json, yaml, or md (default: json)
@@ -170,7 +178,42 @@ create_or_update_agents_from_files(path="./agents", agent_client=client, prefix=
 1. **CLI Parameters** (highest priority): `--azure-tenant-id` and `--project-endpoint`
 2. **Environment Variables** (fallback): `AZURE_TENANT_ID` and `PROJECT_ENDPOINT`
 
-## 📄 Supported File Formats
+## � Agent Lookup
+
+### Get Agent ID by Name
+
+The `--get-agent-id` option allows you to retrieve the unique ID of an agent by its name. This is useful for scripting and automation scenarios where you need to reference an agent by its ID rather than its name.
+
+**Usage:**
+
+```bash
+# Get agent ID
+aif-workflow-helper --get-agent-id my-agent
+
+# Use in a script
+AGENT_ID=$(aif-workflow-helper --get-agent-id my-agent)
+echo "Agent ID: $AGENT_ID"
+
+# With explicit authentication
+aif-workflow-helper --get-agent-id my-agent \
+  --azure-tenant-id "your-tenant-id" \
+  --project-endpoint "your-endpoint"
+```
+
+**Output:**
+
+- On success: Prints the agent ID to stdout (suitable for capturing in scripts)
+- On failure: Logs an error message and exits with code 1
+
+**Example Output:**
+
+```text
+========== Looking up agent: my-agent ==========
+asst_abc123xyz456
+========== Agent 'my-agent' has ID: asst_abc123xyz456 ==========
+```
+
+## �📄 Supported File Formats
 
 The tool supports three file formats for agent definitions:
 
@@ -235,7 +278,7 @@ Please provide clear and concise responses to user questions.
 ├── README.md                    # Project documentation
 ├── agents/                      # Agent definition files
 ├── tests/                       # Test files
-└── src/aif_workflow_helpers/    # Main package source code
+└── src/aif_workflow_helper/     # Main package source code
     ├── __init__.py              # Public exports
     ├── cli/
     │   └── main.py              # CLI entrypoint
@@ -297,7 +340,7 @@ pip install -e .
 which aif-workflow-helper
 
 # Or run directly with Python
-python -m aif_workflow_helpers.cli.main --help
+python -m aif_workflow_helper.cli.main --help
 ```
 
 ## 🎉 Success Output

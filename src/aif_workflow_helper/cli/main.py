@@ -10,7 +10,7 @@ import logging
 
 # Direct imports from the flat structure modules
 from aif_workflow_helper.core.upload import create_or_update_agents_from_files, create_or_update_agent_from_file
-from aif_workflow_helper.core.download import download_agent, download_agents
+from aif_workflow_helper.core.download import download_agent, download_agents, get_agent_by_name
 from aif_workflow_helper.core.formats import SUPPORTED_FORMATS
 from aif_workflow_helper.utils.logging import configure_logging, logger
 
@@ -40,6 +40,11 @@ def process_args() -> argparse.Namespace:
         "--upload-agent",
         default="",
         help="Create/update agents from local definitions",
+    )
+    parser.add_argument(
+        "--get-agent-id",
+        default="",
+        help="Get the agent ID for a given agent name",
     )
     parser.add_argument(
         "--prefix",
@@ -172,12 +177,32 @@ def handle_upload_all_agents_arg(args: argparse.Namespace, agent_client: AgentsC
     except Exception as e:
         logger.error(f"Error uploading agent files: {e}")
 
+def handle_get_agent_id_arg(args: argparse.Namespace, agent_client: AgentsClient) -> None:
+    agent_name = args.get_agent_id
+    if not agent_name:
+        logger.error("Agent name is required for --get-agent-id")
+        sys.exit(1)
+
+    try:
+        logger.info(f"Looking up agent: {agent_name}")
+        agent = get_agent_by_name(agent_name=agent_name, agent_client=agent_client)
+        
+        if agent:
+            print(agent.id)
+            logger.info(f"Agent '{agent_name}' has ID: {agent.id}")
+        else:
+            logger.error(f"Agent '{agent_name}' not found")
+            sys.exit(1)
+    except Exception as e:
+        logger.error(f"Error getting agent ID for '{agent_name}': {e}")
+        sys.exit(1)
+
 def main():
     args = process_args()
 
     setup_logging(log_level_name=args.log_level)
 
-    if args.download_all_agents or args.upload_all_agents or args.download_agent or args.upload_agent:
+    if args.download_all_agents or args.upload_all_agents or args.download_agent or args.upload_agent or args.get_agent_id:
         agent_client = get_agent_client(args)
 
     if args.download_agent:
@@ -191,6 +216,9 @@ def main():
     
     if args.upload_all_agents:
         handle_upload_all_agents_arg(args=args, agent_client=agent_client)
+
+    if args.get_agent_id:
+        handle_get_agent_id_arg(args=args, agent_client=agent_client)
 
 if __name__ == "__main__":
     main()
