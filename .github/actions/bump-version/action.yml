@@ -147,6 +147,8 @@ runs:
         case "${{ inputs.commit_strategy }}" in
           "commit_and_tag")
             echo "📝 Version was already committed by bump2version"
+            echo "🔼 Pushing version bump commit to main..."
+            git push origin HEAD:main
             echo "🏷️ Creating and pushing tag..."
             git tag -a "v${{ steps.bump_version.outputs.version }}" -m "Release v${{ steps.bump_version.outputs.version }}"
             git push origin "v${{ steps.bump_version.outputs.version }}"
