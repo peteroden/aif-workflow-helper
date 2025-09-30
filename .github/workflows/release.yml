@@ -31,7 +31,7 @@ jobs:
       release_title_prefix: 'Release v'
       prerelease: false
       create_release: true
-      commit_strategy: 'tag_only'
+      commit_strategy: 'commit_and_tag'
       branch_condition: 'refs/heads/main'
     secrets:
       api_token: ${{ secrets.PYPI_API_TOKEN }}
