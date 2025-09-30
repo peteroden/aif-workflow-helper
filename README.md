@@ -62,6 +62,18 @@ aif-workflow-helper --upload-agent my_agent --agents-dir agents
 # Get the agent ID for a specific agent by name
 aif-workflow-helper --get-agent-id my_agent
 
+# Delete a single agent (with confirmation prompt)
+aif-workflow-helper --delete-agent my_agent
+
+# Delete a single agent without confirmation
+aif-workflow-helper --delete-agent my_agent --force
+
+# Delete all agents with prefix/suffix filtering (with confirmation)
+aif-workflow-helper --delete-all-agents --prefix dev- --suffix -v1
+
+# Delete all agents without confirmation (DANGEROUS!)
+aif-workflow-helper --delete-all-agents --force
+
 # Download agents in different formats
 aif-workflow-helper --download-all-agents --format json     # Default
 aif-workflow-helper --download-all-agents --format yaml     # YAML format
@@ -165,8 +177,11 @@ create_or_update_agents_from_files(path="./agents", agent_client=client, prefix=
 --upload-all-agents             Create/update all agents from definition files
 --upload-agent NAME             Create/update a single agent from definition file
 --get-agent-id NAME             Get the agent ID for a given agent name
---prefix TEXT                   Optional prefix applied during download/upload
---suffix TEXT                   Optional suffix applied during download/upload
+--delete-agent NAME             Delete a single agent by name
+--delete-all-agents             Delete all agents (filtered by prefix/suffix if provided)
+--force                         Skip confirmation prompts when deleting agents
+--prefix TEXT                   Optional prefix applied during download/upload/delete
+--suffix TEXT                   Optional suffix applied during download/upload/delete
 --format FORMAT                 File format: json, yaml, or md (default: json)
 --log-level LEVEL               Logging level (CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET)
 --azure-tenant-id TENANT_ID     Azure tenant ID (overrides AZURE_TENANT_ID environment variable)
@@ -212,6 +227,82 @@ aif-workflow-helper --get-agent-id my-agent \
 asst_abc123xyz456
 ========== Agent 'my-agent' has ID: asst_abc123xyz456 ==========
 ```
+
+## 🗑️ Deleting Agents
+
+### Delete a Single Agent
+
+Delete an agent by name with an interactive confirmation prompt:
+
+```bash
+# Delete with confirmation prompt
+aif-workflow-helper --delete-agent my-agent
+
+# Skip confirmation prompt with --force flag
+aif-workflow-helper --delete-agent my-agent --force
+
+# Delete agent with prefix/suffix
+aif-workflow-helper --delete-agent my-agent --prefix dev- --suffix -v1
+```
+
+**Interactive Confirmation Example:**
+
+```text
+The following agents will be deleted:
+  - my-agent
+
+Total: 1 agent(s)
+
+Are you sure you want to delete these agents? (yes/no): yes
+========== Successfully deleted agent 'my-agent' (ID: asst_abc123xyz) ==========
+```
+
+### Delete Multiple Agents
+
+Delete all agents matching a prefix/suffix pattern:
+
+```bash
+# Delete all agents starting with "dev-" (with confirmation)
+aif-workflow-helper --delete-all-agents --prefix dev-
+
+# Delete all agents ending with "-v1" (with confirmation)
+aif-workflow-helper --delete-all-agents --suffix -v1
+
+# Delete all agents with both prefix and suffix (with confirmation)
+aif-workflow-helper --delete-all-agents --prefix staging- --suffix -test
+
+# Delete all agents without confirmation (DANGEROUS!)
+aif-workflow-helper --delete-all-agents --force
+
+# Delete all matching agents without confirmation
+aif-workflow-helper --delete-all-agents --prefix dev- --suffix -v1 --force
+```
+
+**Interactive Confirmation Example:**
+
+```text
+The following agents will be deleted:
+  - dev-agent-1-v1
+  - dev-agent-2-v1
+  - dev-worker-v1
+
+Total: 3 agent(s)
+
+Are you sure you want to delete these agents? (yes/no): yes
+========== Deleted agent 'dev-agent-1-v1' (ID: asst_abc123) ==========
+========== Deleted agent 'dev-agent-2-v1' (ID: asst_def456) ==========
+========== Deleted agent 'dev-worker-v1' (ID: asst_ghi789) ==========
+========== Successfully deleted 3 of 3 agent(s) ==========
+```
+
+**Safety Features:**
+
+- **Confirmation Prompt**: By default, you'll be asked to confirm before any deletion
+- **--force Flag**: Skip confirmation for automated scripts (use with caution!)
+- **Prefix/Suffix Filtering**: Target specific agents by name pattern
+- **Detailed Logging**: See exactly which agents will be deleted before confirming
+
+**⚠️ Warning:** Deletion is permanent and cannot be undone. Always double-check the agent names before confirming deletion.
 
 ## �📄 Supported File Formats
 

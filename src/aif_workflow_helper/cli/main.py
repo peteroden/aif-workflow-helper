@@ -11,6 +11,7 @@ import logging
 # Direct imports from the flat structure modules
 from aif_workflow_helper.core.upload import create_or_update_agents_from_files, create_or_update_agent_from_file
 from aif_workflow_helper.core.download import download_agent, download_agents, get_agent_by_name
+from aif_workflow_helper.core.delete import delete_agent_by_name, delete_agents, get_matching_agents
 from aif_workflow_helper.core.formats import SUPPORTED_FORMATS
 from aif_workflow_helper.utils.logging import configure_logging, logger
 
@@ -47,6 +48,21 @@ def process_args() -> argparse.Namespace:
         help="Get the agent ID for a given agent name",
     )
     parser.add_argument(
+        "--delete-agent",
+        default="",
+        help="Delete a single agent by name",
+    )
+    parser.add_argument(
+        "--delete-all-agents",
+        action="store_true",
+        help="Delete all agents matching prefix/suffix filters (requires confirmation unless --force is used)",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Skip confirmation prompts when deleting agents",
+    )
+    parser.add_argument(
         "--prefix",
         default="",
         help="Add a prefix to the Agent name when uploading or downloading",
@@ -81,6 +97,30 @@ def process_args() -> argparse.Namespace:
 
     args = parser.parse_args()
     return args
+
+def confirm_deletion(agent_names: list[str]) -> bool:
+    """Prompt user to confirm deletion of agents.
+    
+    Args:
+        agent_names: List of agent names to be deleted
+        
+    Returns:
+        True if user confirms, False otherwise
+    """
+    if not agent_names:
+        return False
+    
+    print("\nThe following agents will be deleted:")
+    for name in agent_names:
+        print(f"  - {name}")
+    print(f"\nTotal: {len(agent_names)} agent(s)")
+    
+    try:
+        response = input("\nAre you sure you want to delete these agents? (yes/no): ").strip().lower()
+        return response in ['yes', 'y']
+    except (EOFError, KeyboardInterrupt):
+        print("\nOperation cancelled.")
+        return False
 
 def setup_logging(log_level_name: str) -> None:
     # Initialize logging once
@@ -197,12 +237,75 @@ def handle_get_agent_id_arg(args: argparse.Namespace, agent_client: AgentsClient
         logger.error(f"Error getting agent ID for '{agent_name}': {e}")
         sys.exit(1)
 
+def handle_delete_agent_arg(args: argparse.Namespace, agent_client: AgentsClient) -> None:
+    agent_name = args.delete_agent
+    if not agent_name:
+        logger.error("Agent name is required for --delete-agent")
+        sys.exit(1)
+
+    try:
+        full_agent_name = f"{args.prefix}{agent_name}{args.suffix}"
+        
+        # Confirm deletion unless force flag is set
+        if not args.force:
+            if not confirm_deletion([full_agent_name]):
+                logger.info("Deletion cancelled by user.")
+                sys.exit(0)
+        
+        success = delete_agent_by_name(
+            agent_name=agent_name,
+            agent_client=agent_client,
+            prefix=args.prefix,
+            suffix=args.suffix
+        )
+        if not success:
+            sys.exit(1)
+    except Exception as e:
+        logger.error(f"Error deleting agent '{agent_name}': {e}")
+        sys.exit(1)
+
+def handle_delete_all_agents_arg(args: argparse.Namespace, agent_client: AgentsClient) -> None:
+    try:
+        logger.info("Connecting...")
+        all_agents = list(agent_client.list_agents())
+        logger.info(f"Connected. Found {len(all_agents)} existing agents")
+        
+        # Get matching agents
+        matching_agents = get_matching_agents(
+            agent_client=agent_client,
+            prefix=args.prefix,
+            suffix=args.suffix
+        )
+        
+        if not matching_agents:
+            logger.info("No agents found matching the specified criteria.")
+            return
+        
+        agent_names = [agent.name for agent in matching_agents]
+        
+        # Confirm deletion unless force flag is set
+        if not args.force:
+            if not confirm_deletion(agent_names):
+                logger.info("Deletion cancelled by user.")
+                return
+        
+        success, deleted_count = delete_agents(
+            agent_client=agent_client,
+            agent_list=matching_agents
+        )
+        
+        if not success:
+            sys.exit(1)
+    except Exception as e:
+        logger.error(f"Error during bulk deletion: {e}")
+        sys.exit(1)
+
 def main():
     args = process_args()
 
     setup_logging(log_level_name=args.log_level)
 
-    if args.download_all_agents or args.upload_all_agents or args.download_agent or args.upload_agent or args.get_agent_id:
+    if args.download_all_agents or args.upload_all_agents or args.download_agent or args.upload_agent or args.get_agent_id or args.delete_agent or args.delete_all_agents:
         agent_client = get_agent_client(args)
 
     if args.download_agent:
@@ -219,6 +322,12 @@ def main():
 
     if args.get_agent_id:
         handle_get_agent_id_arg(args=args, agent_client=agent_client)
+
+    if args.delete_agent:
+        handle_delete_agent_arg(args=args, agent_client=agent_client)
+
+    if args.delete_all_agents:
+        handle_delete_all_agents_arg(args=args, agent_client=agent_client)
 
 if __name__ == "__main__":
     main()
