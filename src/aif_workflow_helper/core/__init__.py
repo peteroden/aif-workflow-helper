@@ -12,6 +12,11 @@ from .download import (
     download_agent,
 )
 
+from .delete import (
+    delete_agent_by_name,
+    delete_agents,
+)
+
 from .formats import (
     SUPPORTED_FORMATS,
     EXTENSION_MAP,
@@ -29,6 +34,8 @@ __all__ = [
     "create_or_update_agents_from_files",
     "download_agents",
     "download_agent",
+    "delete_agent_by_name",
+    "delete_agents",
     "SUPPORTED_FORMATS",
     "EXTENSION_MAP",
     "GLOB_PATTERN_MAP", 
