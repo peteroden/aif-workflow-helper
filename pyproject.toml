@@ -12,7 +12,7 @@ include = ["src*"]
 
 [project]
 name = "aif-workflow-helper"
-version = "0.2.0"
+version = "0.3.0"
 description = "Azure AI Foundry dev workflow helpers"
 authors = [
   { name = "Pete Roden", email = "pete.roden@live.com" }
