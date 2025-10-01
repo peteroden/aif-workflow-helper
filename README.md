@@ -355,6 +355,12 @@ You are a helpful AI assistant.
 Please provide clear and concise responses to user questions.
 ```
 
+**Markdown Format Behavior:**
+
+- **Trailing Newlines**: The markdown format preserves trailing newlines in the instructions content to maintain exact formatting across upload/download cycles. All markdown files end with a newline character following Unix text file conventions.
+- **Frontmatter Library**: The tool uses the `python-frontmatter` library, which strips trailing newlines from content when reading. The tool automatically detects and restores these newlines to ensure perfect roundtrip consistency.
+- **Multi-line Fields**: YAML frontmatter fields (like `description`) can use multi-line string syntax for better readability.
+
 **File Extensions:**
 
 - JSON: `.json`
@@ -390,6 +396,11 @@ Please provide clear and concise responses to user questions.
 4. **Logging**: Centralized configurable logger (`configure_logging`)
 5. **Efficiency**: Minimizes duplicate lookups by caching existing agents during batch operations
 6. **Format Flexibility**: Supports JSON, YAML, and Markdown with frontmatter for different workflow preferences
+7. **Roundtrip Consistency**: All formats support perfect roundtrip consistency - downloading and re-uploading an agent produces identical results. This includes:
+   - Preserving trailing newlines in markdown format
+   - Maintaining exact data types (numbers, booleans, nulls) in JSON/YAML
+   - Preserving complex nested structures and metadata
+   - Handling unicode characters and emojis correctly
 
 ## 🔍 Troubleshooting
 

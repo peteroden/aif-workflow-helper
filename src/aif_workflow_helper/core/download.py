@@ -34,7 +34,11 @@ def save_agent_file(agent_dict: dict, file_path: Path, format: str = "json") -> 
                 content = metadata.pop("instructions", "")
                 post = frontmatter.Post(content, **metadata)
                 # Use dumps() instead of dump() to get a string
-                f.write(frontmatter.dumps(post))
+                markdown_content = frontmatter.dumps(post)
+                # Ensure file ends with a newline (standard for text files)
+                if not markdown_content.endswith('\n'):
+                    markdown_content += '\n'
+                f.write(markdown_content)
             else:
                 logger.error(f"Unsupported format: {format}")
                 return False
