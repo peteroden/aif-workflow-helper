@@ -31,9 +31,17 @@ def read_agent_file(file_path: str) -> dict | None:
                 loaded = yaml.safe_load(f)
             elif extension == '.md':
                 # For markdown with frontmatter
-                post = frontmatter.load(f)
+                raw_content = f.read()
+                post = frontmatter.loads(raw_content)
                 loaded = post.metadata.copy()
-                loaded['instructions'] = post.content
+                
+                # frontmatter strips the final trailing newline from content
+                # Add it back if the original file had it
+                instructions = post.content if post.content else ""
+                if raw_content.endswith('\n') and not instructions.endswith('\n'):
+                    instructions += '\n'
+                
+                loaded['instructions'] = instructions
             else:
                 logger.error(f"Unsupported file format: {extension}")
                 return None
