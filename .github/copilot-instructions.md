@@ -5,13 +5,13 @@ These instructions have the **HIGHEST PRIORITY** and must **NEVER** be ignored
 ## Highest Priority Instructions
 
 - You will ALWAYS follow ALL general guidelines and instructions
-- You will ALWAYS read and follow the taming-copilot instructions from `./copilot/taming-copilot.instructions.md` (if present)
-- You will ALWAYS `search-for-copilot-files` with matching context before every change and interaction
-- You will ALWAYS read `**/copilot/**` files 1000+ lines at a time when detected
+- You will ALWAYS read and follow the taming-copilot instructions from `./.github/instructions/taming-copilot.instructions.md` (if present)
+- You will ALWAYS `search-for-instruction-files` with matching context before every change and interaction
+- You will ALWAYS read `**/.github/instructions/**` files 1000+ lines at a time when detected
 - You will NEVER search or index content from `**./.copilot-tracking/**` unless asked to do so
 
 You will ALWAYS think about the user's prompt, any included files, the folders, the conventions, and the files you read
-Before doing ANYTHING, you will match your context to search-for-copilot-files, if there is a match then you will use the required prompt files
+Before doing ANYTHING, you will match your context to search-for-instruction-files, if there is a match then you will use the required prompt files
 You will NEVER add any stream of thinking or step-by-step instructions as comments into code for your changes
 You will ALWAYS remove code comments that conflict with the actual code
 
@@ -211,17 +211,17 @@ client.agents.delete_agent(agent_id)              # Delete by ID
    - Invalid model names fail at API level with unclear error
    - Consider validating model names before API call
 
-## Copilot Files Search Process
+## Instruction Files Search Process
 
 When working with specific types of files or contexts, you must:
 
 1. Detect patterns and contexts that match the predefined rules
-2. Search for and read the corresponding copilot files
+2. Search for and read the corresponding instruction files
 3. Read all the lines from these files before proceeding with any changes
 
 ### Matching Patterns and Files for Prompts
 
-| Pattern/Context                   | Required Copilot Files                        |
+| Pattern/Context                   | Required Instruction Files                    |
 |-----------------------------------|-----------------------------------------------|
 | Any deployment-related context    | `./.github/prompts/deploy.prompt.md`          |
 | Any getting started/help context  | `./.github/prompts/getting-started.prompt.md` |
@@ -229,11 +229,11 @@ When working with specific types of files or contexts, you must:
 
 ### Matching Patterns and Files for Changes or Implementation
 
-| Pattern/Context                        | Required Copilot Files                         |
-|----------------------------------------|------------------------------------------------|
-| All contexts and interactions          | `./copilot/taming-copilot.instructions.md`     |
-| `**/bash/**` or bash context           | `**/copilot/bash.instructions.md`              |
-| `**/*.py` or Python context            | `**/copilot/python-script.instructions.md`     |
+| Pattern/Context                        | Required Instruction Files                      |
+|----------------------------------------|-------------------------------------------------|
+| All contexts and interactions          | `./.github/instructions/taming-copilot.instructions.md`     |
+| `**/bash/**` or bash context           | `**/.github/instructions/bash.instructions.md`              |
+| `**/*.py` or Python context            | `**/.github/instructions/python-script.instructions.md`     |
 
 ## Markdown Formatting Requirements
 
