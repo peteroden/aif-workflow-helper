@@ -1,14 +1,13 @@
-import json
-import yaml
-import frontmatter
-
-from glob import glob
 from collections import defaultdict
 from pathlib import Path
 from azure.ai.agents import AgentsClient, models
 from aif_workflow_helper.utils.validation import validate_agent_name
-from aif_workflow_helper.core.formats import get_glob_pattern, get_file_extension, get_alternative_extensions
+from aif_workflow_helper.core.formats import get_file_extension, get_alternative_extensions
 from aif_workflow_helper.utils.logging import logger
+from aif_workflow_helper.core.transformers.filesystem import (
+    load_agent_from_file,
+    load_agents_from_directory,
+)
 
 def read_agent_file(file_path: str) -> dict | None:
     """Read a single agent file in any supported format.
@@ -19,44 +18,7 @@ def read_agent_file(file_path: str) -> dict | None:
     Returns:
         Parsed dictionary if successful; otherwise None on error.
     """
-    data: dict | None = None
-    try:
-        file_path_obj = Path(file_path)
-        extension = file_path_obj.suffix.lower()
-        
-        with open(file_path, 'r') as f:
-            if extension == '.json':
-                loaded = json.load(f)
-            elif extension in ['.yaml', '.yml']:
-                loaded = yaml.safe_load(f)
-            elif extension == '.md':
-                # For markdown with frontmatter
-                raw_content = f.read()
-                post = frontmatter.loads(raw_content)
-                loaded = post.metadata.copy()
-                
-                # frontmatter strips the final trailing newline from content
-                # Add it back if the original file had it
-                instructions = post.content if post.content else ""
-                if raw_content.endswith('\n') and not instructions.endswith('\n'):
-                    instructions += '\n'
-                
-                loaded['instructions'] = instructions
-            else:
-                logger.error(f"Unsupported file format: {extension}")
-                return None
-                
-        logger.info(f"Successfully read agent file: {file_path}")
-        data = loaded
-    except json.JSONDecodeError as e:
-        logger.error(f"Invalid JSON in {file_path}: {e}")
-    except yaml.YAMLError as e:
-        logger.error(f"Invalid YAML in {file_path}: {e}")
-    except FileNotFoundError:
-        logger.error(f"Agent file not found: {file_path}")
-    except Exception as e:
-        logger.error(f"Unexpected error reading {file_path}: {e}")
-    return data
+    return load_agent_from_file(Path(file_path))
 
 def read_agent_files(path: str = ".", format: str = "json") -> dict:
     """Load all agent files in a directory for the specified format.
@@ -68,21 +30,8 @@ def read_agent_files(path: str = ".", format: str = "json") -> dict:
     Returns:
         Mapping of agent name to raw agent definition dictionaries.
     """
-    # Get the glob pattern for the format
-    pattern = get_glob_pattern(format)
-    agent_files = glob(f"{path}/{pattern}")
-    
-    # Also check for alternative extensions if available
-    for alt_ext in get_alternative_extensions(format):
-        alt_pattern = f"*{alt_ext}"
-        agent_files.extend(glob(f"{path}/{alt_pattern}"))
-    
-    agents_data = {}
-    for file in agent_files:
-        agent_data = read_agent_file(file)
-        if agent_data:
-            agents_data[agent_data["name"]] = agent_data    
-    return agents_data
+    agents_dir = Path(path)
+    return load_agents_from_directory(agents_dir, format)
 
 def extract_dependencies(agents_data: dict) -> defaultdict:
     """Extract inter-agent dependencies from agent definitions.

@@ -52,10 +52,10 @@ You will ALWAYS remove code comments that conflict with the actual code
 ### Setup & Installation
 ```bash
 # Install in editable mode for development
-pip install -e .
+uv pip install -e .
 
 # Install with dev dependencies
-pip install -e ".[dev]"  # if dev extras exist, otherwise use requirements.txt
+uv pip install -e ".[dev]"  # uv users can also run: `uv sync`
 ```
 
 ### Testing Commands

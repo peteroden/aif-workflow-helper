@@ -4,8 +4,6 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from azure.ai.agents import AgentsClient
-from azure.identity import DefaultAzureCredential
 import logging
 
 # Direct imports from the flat structure modules
@@ -13,6 +11,7 @@ from aif_workflow_helper.core.upload import create_or_update_agents_from_files, 
 from aif_workflow_helper.core.download import download_agent, download_agents, get_agent_by_name
 from aif_workflow_helper.core.delete import delete_agent_by_name, delete_agents, get_matching_agents
 from aif_workflow_helper.core.formats import SUPPORTED_FORMATS
+from aif_workflow_helper.core.agent_framework_client import AgentFrameworkAgentsClient
 from aif_workflow_helper.utils.logging import configure_logging, logger
 
 def process_args() -> argparse.Namespace:
@@ -92,7 +91,12 @@ def process_args() -> argparse.Namespace:
     parser.add_argument(
         "--project-endpoint",
         default="",
-        help="AI Foundry project endpoint URL (overrides PROJECT_ENDPOINT environment variable)",
+        help="AI Foundry project endpoint URL (overrides AZURE_AI_PROJECT_ENDPOINT/PROJECT_ENDPOINT environment variables)",
+    )
+    parser.add_argument(
+        "--model-deployment-name",
+        default="",
+        help="Default model deployment name used by the Agent Framework SDK",
     )
 
     args = parser.parse_args()
@@ -141,28 +145,46 @@ def setup_logging(log_level_name: str) -> None:
     except Exception:  # pragma: no cover
         configure_logging()
 
-def get_agent_client(args: argparse.Namespace) -> AgentsClient:
-    # Use CLI parameters if provided, otherwise fall back to environment variables
-    tenant_id = args.azure_tenant_id if args.azure_tenant_id else os.getenv("AZURE_TENANT_ID")
+def get_agent_client(args: argparse.Namespace) -> AgentFrameworkAgentsClient:
+    """Create the Agent Framework-backed client using CLI args or environment variables."""
+
+    tenant_id = args.azure_tenant_id or os.getenv("AZURE_TENANT_ID")
     if not tenant_id:
-        logger.error("Azure tenant ID is required. Provide it via --azure-tenant-id or AZURE_TENANT_ID environment variable")
+        logger.error(
+            "Azure tenant ID is required. Provide it via --azure-tenant-id or AZURE_TENANT_ID environment variable",
+        )
         sys.exit(1)
 
-    endpoint = args.project_endpoint if args.project_endpoint else os.getenv("PROJECT_ENDPOINT")
+    endpoint = (
+        args.project_endpoint
+        or os.getenv("AZURE_AI_PROJECT_ENDPOINT")
+        or os.getenv("PROJECT_ENDPOINT")
+    )
     if not endpoint:
-        logger.error("Project endpoint is required. Provide it via --project-endpoint or PROJECT_ENDPOINT environment variable")
+        logger.error(
+            "Project endpoint is required. Provide it via --project-endpoint, "
+            "AZURE_AI_PROJECT_ENDPOINT, or PROJECT_ENDPOINT environment variable",
+        )
         sys.exit(1)
 
-    agent_client = AgentsClient(
-        credential=DefaultAzureCredential(
-            exclude_interactive_browser_credential=False,
-            interactive_tenant_id=tenant_id
-        ),
-        endpoint=endpoint)
-    
-    return agent_client
+    model_deployment = (
+        args.model_deployment_name
+        or os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME")
+    )
+    if not model_deployment:
+        logger.error(
+            "Model deployment name is required. Provide it via --model-deployment-name "
+            "or AZURE_AI_MODEL_DEPLOYMENT_NAME environment variable",
+        )
+        sys.exit(1)
 
-def handle_download_agent_arg(args: argparse.Namespace, agent_client: AgentsClient) -> None:
+    return AgentFrameworkAgentsClient(
+        project_endpoint=endpoint,
+        tenant_id=tenant_id,
+        model_deployment_name=model_deployment,
+    )
+
+def handle_download_agent_arg(args: argparse.Namespace, agent_client: AgentFrameworkAgentsClient) -> None:
     if args.download_agent != "":
         agents_dir = Path(args.agents_dir)
         agents_dir.mkdir(parents=True, exist_ok=True)
@@ -179,20 +201,20 @@ def handle_download_agent_arg(args: argparse.Namespace, agent_client: AgentsClie
     else:
         logger.info("Agent name not provided")
 
-def handle_download_all_agents_arg(args: argparse.Namespace, agent_client: AgentsClient) -> None:
-        agents_dir = Path(args.agents_dir)
-        agents_dir.mkdir(parents=True, exist_ok=True)
-        try:
-            logger.info("Connecting...")
-            agents = list(agent_client.list_agents())
-            logger.info(f"Connected. Found {len(agents)} existing agents")
+def handle_download_all_agents_arg(args: argparse.Namespace, agent_client: AgentFrameworkAgentsClient) -> None:
+    agents_dir = Path(args.agents_dir)
+    agents_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        logger.info("Connecting...")
+        agents = list(agent_client.list_agents())
+        logger.info(f"Connected. Found {len(agents)} existing agents")
 
-            logger.info("Downloading agents...")
-            download_agents(agent_client, file_path=agents_dir, prefix=args.prefix, suffix=args.suffix, format=args.format)
-        except Exception as e:
-            logger.error(f"Unhandled error in downloading agents: {e}")
+        logger.info("Downloading agents...")
+        download_agents(agent_client, file_path=agents_dir, prefix=args.prefix, suffix=args.suffix, format=args.format)
+    except Exception as e:
+        logger.error(f"Unhandled error in downloading agents: {e}")
 
-def handle_upload_agent_arg(args: argparse.Namespace, agent_client: AgentsClient) -> None:
+def handle_upload_agent_arg(args: argparse.Namespace, agent_client: AgentFrameworkAgentsClient) -> None:
     agents_dir = Path(args.agents_dir)
     if not agents_dir.exists() or not agents_dir.is_dir():
         logger.error(f"Agents directory not found: {agents_dir}")
@@ -205,7 +227,7 @@ def handle_upload_agent_arg(args: argparse.Namespace, agent_client: AgentsClient
     except Exception as e:
         logger.error(f"Error uploading agent {agent_name}: {e}")
 
-def handle_upload_all_agents_arg(args: argparse.Namespace, agent_client: AgentsClient) -> None:
+def handle_upload_all_agents_arg(args: argparse.Namespace, agent_client: AgentFrameworkAgentsClient) -> None:
     agents_dir = Path(args.agents_dir)
     if not agents_dir.exists() or not agents_dir.is_dir():
         logger.error(f"Agents directory not found: {agents_dir}")
@@ -217,7 +239,7 @@ def handle_upload_all_agents_arg(args: argparse.Namespace, agent_client: AgentsC
     except Exception as e:
         logger.error(f"Error uploading agent files: {e}")
 
-def handle_get_agent_id_arg(args: argparse.Namespace, agent_client: AgentsClient) -> None:
+def handle_get_agent_id_arg(args: argparse.Namespace, agent_client: AgentFrameworkAgentsClient) -> None:
     agent_name = args.get_agent_id
     if not agent_name:
         logger.error("Agent name is required for --get-agent-id")
@@ -237,7 +259,7 @@ def handle_get_agent_id_arg(args: argparse.Namespace, agent_client: AgentsClient
         logger.error(f"Error getting agent ID for '{agent_name}': {e}")
         sys.exit(1)
 
-def handle_delete_agent_arg(args: argparse.Namespace, agent_client: AgentsClient) -> None:
+def handle_delete_agent_arg(args: argparse.Namespace, agent_client: AgentFrameworkAgentsClient) -> None:
     agent_name = args.delete_agent
     if not agent_name:
         logger.error("Agent name is required for --delete-agent")
@@ -264,7 +286,7 @@ def handle_delete_agent_arg(args: argparse.Namespace, agent_client: AgentsClient
         logger.error(f"Error deleting agent '{agent_name}': {e}")
         sys.exit(1)
 
-def handle_delete_all_agents_arg(args: argparse.Namespace, agent_client: AgentsClient) -> None:
+def handle_delete_all_agents_arg(args: argparse.Namespace, agent_client: AgentFrameworkAgentsClient) -> None:
     try:
         logger.info("Connecting...")
         all_agents = list(agent_client.list_agents())
@@ -305,29 +327,46 @@ def main():
 
     setup_logging(log_level_name=args.log_level)
 
-    if args.download_all_agents or args.upload_all_agents or args.download_agent or args.upload_agent or args.get_agent_id or args.delete_agent or args.delete_all_agents:
-        agent_client = get_agent_client(args)
+    agent_client: AgentFrameworkAgentsClient | None = None
+    operations_requested = any(
+        [
+            args.download_all_agents,
+            args.upload_all_agents,
+            args.download_agent,
+            args.upload_agent,
+            args.get_agent_id,
+            args.delete_agent,
+            args.delete_all_agents,
+        ]
+    )
 
-    if args.download_agent:
-        handle_download_agent_arg(args=args, agent_client=agent_client)
+    try:
+        if operations_requested:
+            agent_client = get_agent_client(args)
 
-    if args.download_all_agents:
-        handle_download_all_agents_arg(args=args, agent_client=agent_client)
+        if args.download_agent and agent_client:
+            handle_download_agent_arg(args=args, agent_client=agent_client)
 
-    if args.upload_agent:
-        handle_upload_agent_arg(args=args, agent_client=agent_client)
-    
-    if args.upload_all_agents:
-        handle_upload_all_agents_arg(args=args, agent_client=agent_client)
+        if args.download_all_agents and agent_client:
+            handle_download_all_agents_arg(args=args, agent_client=agent_client)
 
-    if args.get_agent_id:
-        handle_get_agent_id_arg(args=args, agent_client=agent_client)
+        if args.upload_agent and agent_client:
+            handle_upload_agent_arg(args=args, agent_client=agent_client)
 
-    if args.delete_agent:
-        handle_delete_agent_arg(args=args, agent_client=agent_client)
+        if args.upload_all_agents and agent_client:
+            handle_upload_all_agents_arg(args=args, agent_client=agent_client)
 
-    if args.delete_all_agents:
-        handle_delete_all_agents_arg(args=args, agent_client=agent_client)
+        if args.get_agent_id and agent_client:
+            handle_get_agent_id_arg(args=args, agent_client=agent_client)
+
+        if args.delete_agent and agent_client:
+            handle_delete_agent_arg(args=args, agent_client=agent_client)
+
+        if args.delete_all_agents and agent_client:
+            handle_delete_all_agents_arg(args=args, agent_client=agent_client)
+    finally:
+        if agent_client is not None:
+            agent_client.close()
 
 if __name__ == "__main__":
     main()

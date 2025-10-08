@@ -1,8 +1,6 @@
 import os
 import json
 from pathlib import Path 
-import yaml
-import frontmatter
 
 from azure.ai.agents import AgentsClient
 from azure.ai.agents.models import Agent
@@ -10,6 +8,7 @@ from azure.ai.agents.models import Agent
 from aif_workflow_helper.utils.logging import logger
 from aif_workflow_helper.utils.validation import validate_agent_name
 from aif_workflow_helper.core.formats import get_file_extension
+from aif_workflow_helper.core.transformers.filesystem import save_agent_to_file as filesystem_save_agent
 
 def save_agent_file(agent_dict: dict, file_path: Path, format: str = "json") -> bool:
     """Save agent data to file in the specified format.
@@ -22,30 +21,7 @@ def save_agent_file(agent_dict: dict, file_path: Path, format: str = "json") -> 
     Returns:
         True if successful, False otherwise
     """
-    try:
-        with open(file_path, 'w') as f:
-            if format == "json":
-                json.dump(agent_dict, f, indent=2)
-            elif format == "yaml":
-                yaml.dump(agent_dict, f, default_flow_style=False, allow_unicode=True)
-            elif format == "md":
-                # For markdown, instructions become content and rest goes to frontmatter
-                metadata = agent_dict.copy()
-                content = metadata.pop("instructions", "")
-                post = frontmatter.Post(content, **metadata)
-                # Use dumps() instead of dump() to get a string
-                markdown_content = frontmatter.dumps(post)
-                # Ensure file ends with a newline (standard for text files)
-                if not markdown_content.endswith('\n'):
-                    markdown_content += '\n'
-                f.write(markdown_content)
-            else:
-                logger.error(f"Unsupported format: {format}")
-                return False
-        return True
-    except Exception as e:
-        logger.error(f"Error saving file {file_path}: {e}")
-        return False
+    return filesystem_save_agent(agent_dict, Path(file_path), format)
 
 def trim_agent_name(agent_name: str, prefix: str = "", suffix: str = "") -> str:
     """Remove provided prefix and suffix from an agent name if present.

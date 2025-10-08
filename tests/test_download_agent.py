@@ -1,7 +1,9 @@
 import io
 import json
 from unittest.mock import MagicMock, patch
-from aif_workflow_helper.core.download import download_agent
+
+import aif_workflow_helper.core.download as download_module
+from aif_workflow_helper.core.download import download_agent, download_agents
 
 def make_agent(name, as_dict=None):
     agent = MagicMock()
@@ -45,3 +47,47 @@ def test_download_agent_file_error(mock_open, caplog):
     download_agent("fail-agent", client)
     # Should log an error or warning, but not raise
     assert any("fail" in m for m in caplog.messages)
+
+
+def test_download_agent_directory_creation_failure(monkeypatch):
+    agent = make_agent("test-agent", {"name": "test-agent", "tools": []})
+    client = DummyClient(agent)
+
+    monkeypatch.setattr(
+        download_module.os,
+        "makedirs",
+        MagicMock(side_effect=OSError("nope")),
+    )
+
+    result = download_agent("test-agent", client, file_path="/tmp/out")
+
+    assert result is False
+
+
+def test_download_agents_returns_false_when_save_fails(monkeypatch):
+    agent = make_agent("test-agent", {"name": "test-agent", "tools": []})
+    client = DummyClient(agent)
+
+    monkeypatch.setattr(
+        download_module,
+        "save_agent_file",
+        MagicMock(return_value=False),
+    )
+
+    result = download_agents(client, file_path="/tmp/out")
+
+    assert result is False
+
+
+def test_download_agent_returns_false_when_agent_missing(monkeypatch):
+    client = DummyClient(None)
+
+    monkeypatch.setattr(
+        download_module.os,
+        "makedirs",
+        MagicMock(),
+    )
+
+    result = download_agent("unknown", client, file_path="/tmp/out")
+
+    assert result is False

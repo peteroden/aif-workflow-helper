@@ -1,5 +1,0 @@
-azure-ai-projects
-azure-ai-agents
-azure-identity
-pyyaml
-python-frontmatter

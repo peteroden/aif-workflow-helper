@@ -30,7 +30,9 @@ classifiers = [
 # Core runtime dependencies
 dependencies = [
   "azure-ai-projects",
-  "azure-ai-agents",
+  "azure-ai-agents==1.2.0b5",
+  "agent-framework==1.0.0b251007",
+  "agent-framework-azure-ai==1.0.0b251007",
   "azure-identity",
   "pyyaml",
   "python-frontmatter",

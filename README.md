@@ -8,17 +8,19 @@ Utilities for exporting (downloading) and importing (creating/updating) Azure AI
 
 ```bash
 export AZURE_TENANT_ID='your-tenant-id-here'
-export PROJECT_ENDPOINT='your-ai-foundry-endpoint-here'
+export AZURE_AI_PROJECT_ENDPOINT='your-ai-foundry-endpoint-here'
+export AZURE_AI_MODEL_DEPLOYMENT_NAME='your-default-model-deployment'
 ```
 
 **Example:**
 
 ```bash
 export AZURE_TENANT_ID='aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
-export PROJECT_ENDPOINT='https://your-resource.services.ai.azure.com/api/projects/your-project'
+export AZURE_AI_PROJECT_ENDPOINT='https://your-resource.services.ai.azure.com/api/projects/your-project'
+export AZURE_AI_MODEL_DEPLOYMENT_NAME='gpt-4o-preview'
 ```
 
-> **Note:** You can also provide these values via CLI parameters (`--azure-tenant-id` and `--project-endpoint`) which will take precedence over environment variables.
+> **Note:** You can also provide these values via CLI parameters (`--azure-tenant-id`, `--project-endpoint`, and `--model-deployment-name`) which take precedence over environment variables. The legacy `PROJECT_ENDPOINT` variable is still honored as a fallback when `AZURE_AI_PROJECT_ENDPOINT` is unset.
 
 ### 2. Install the Package
 
@@ -185,13 +187,14 @@ create_or_update_agents_from_files(path="./agents", agent_client=client, prefix=
 --format FORMAT                 File format: json, yaml, or md (default: json)
 --log-level LEVEL               Logging level (CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET)
 --azure-tenant-id TENANT_ID     Azure tenant ID (overrides AZURE_TENANT_ID environment variable)
---project-endpoint ENDPOINT     AI Foundry project endpoint URL (overrides PROJECT_ENDPOINT environment variable)
+--project-endpoint ENDPOINT     AI Foundry project endpoint URL (overrides AZURE_AI_PROJECT_ENDPOINT/PROJECT_ENDPOINT)
+--model-deployment-name NAME    Default model deployment name (overrides AZURE_AI_MODEL_DEPLOYMENT_NAME)
 ```
 
 ### Authentication Priority
 
-1. **CLI Parameters** (highest priority): `--azure-tenant-id` and `--project-endpoint`
-2. **Environment Variables** (fallback): `AZURE_TENANT_ID` and `PROJECT_ENDPOINT`
+1. **CLI Parameters** (highest priority): `--azure-tenant-id`, `--project-endpoint`, and `--model-deployment-name`
+2. **Environment Variables** (fallback): `AZURE_TENANT_ID`, `AZURE_AI_PROJECT_ENDPOINT` (or legacy `PROJECT_ENDPOINT`), and `AZURE_AI_MODEL_DEPLOYMENT_NAME`
 
 ## � Agent Lookup
 
@@ -212,7 +215,8 @@ echo "Agent ID: $AGENT_ID"
 # With explicit authentication
 aif-workflow-helper --get-agent-id my-agent \
   --azure-tenant-id "your-tenant-id" \
-  --project-endpoint "your-endpoint"
+  --project-endpoint "your-endpoint" \
+  --model-deployment-name "your-model-deployment"
 ```
 
 **Output:**
@@ -370,8 +374,7 @@ Please provide clear and concise responses to user questions.
 ## 📋 File Structure
 
 ```text
-├── pyproject.toml               # Package configuration and dependencies
-├── requirements.txt             # Core runtime dependencies
+├── pyproject.toml               # Project configuration & dependencies (uv managed)
 ├── README.md                    # Project documentation
 ├── agents/                      # Agent definition files
 ├── tests/                       # Test files
@@ -419,12 +422,14 @@ pip install .
 ```bash
 # Check environment variables
 echo $AZURE_TENANT_ID
-echo $PROJECT_ENDPOINT
+echo $AZURE_AI_PROJECT_ENDPOINT
+echo $AZURE_AI_MODEL_DEPLOYMENT_NAME
 
 # Or use CLI parameters (recommended for CI/CD or when environment variables conflict)
 aif-workflow-helper --download-all-agents \
   --azure-tenant-id "your-tenant-id" \
-  --project-endpoint "your-endpoint"
+  --project-endpoint "your-endpoint" \
+  --model-deployment-name "your-model-deployment"
 
 # Try interactive login
 az login --tenant $AZURE_TENANT_ID
