@@ -2,15 +2,17 @@ import os
 import json
 from pathlib import Path 
 
-from azure.ai.agents import AgentsClient
-from azure.ai.agents.models import Agent
+from aif_workflow_helper.core.types import AgentLike
 
 from aif_workflow_helper.utils.logging import logger
 from aif_workflow_helper.utils.validation import validate_agent_name
 from aif_workflow_helper.core.formats import get_file_extension
+from aif_workflow_helper.core.types import SupportsAgents
 from aif_workflow_helper.core.transformers.filesystem import save_agent_to_file as filesystem_save_agent
 
-def save_agent_file(agent_dict: dict, file_path: Path, format: str = "json") -> bool:
+from typing import Optional, Union
+
+def save_agent_file(agent_dict: dict, file_path: Union[str, Path], format: str = "json") -> bool:
     """Save agent data to file in the specified format.
     
     Args:
@@ -40,7 +42,7 @@ def trim_agent_name(agent_name: str, prefix: str = "", suffix: str = "") -> str:
         agent_name = agent_name[:-len(suffix)]
     return agent_name
 
-def get_agent_name(agent_id: str, agent_client: AgentsClient) -> str | None:
+def get_agent_name(agent_id: str, agent_client: SupportsAgents) -> Optional[str]:
     """Retrieve an agent's name by its ID.
 
     Args:
@@ -59,7 +61,7 @@ def get_agent_name(agent_id: str, agent_client: AgentsClient) -> str | None:
         logger.warning(f"Error getting agent name for ID {agent_id}: {e}")
     return name
 
-def get_agent_by_name(agent_name: str, agent_client: AgentsClient) -> Agent | None:
+def get_agent_by_name(agent_name: str, agent_client: SupportsAgents) -> Optional[AgentLike]:
     """Fetch an agent object by its name.
 
     Args:
@@ -69,7 +71,7 @@ def get_agent_by_name(agent_name: str, agent_client: AgentsClient) -> Agent | No
     Returns:
         The matching Agent instance if found; otherwise None.
     """
-    found: Agent | None = None
+    found: AgentLike | None = None
     try:
         agent_list = agent_client.list_agents()
         for agent in agent_list:
@@ -80,7 +82,7 @@ def get_agent_by_name(agent_name: str, agent_client: AgentsClient) -> Agent | No
         logger.warning(f"Error getting agent by name '{agent_name}': {e}")
     return found
 
-def generalize_agent_dict(data: dict, agent_client: AgentsClient, prefix: str = "", suffix: str = "") -> dict:
+def generalize_agent_dict(data: dict, agent_client: SupportsAgents, prefix: str = "", suffix: str = "") -> dict:
     """Normalize an agent-derived structure for export.
 
     Removes transient keys (``id``, ``created_at``), converts connected agent
@@ -104,7 +106,7 @@ def generalize_agent_dict(data: dict, agent_client: AgentsClient, prefix: str = 
             agent_id = connected_agent_data.get('id')
             agent_name = get_agent_name(agent_id, agent_client) if agent_id is not None else None
 
-            processed: dict = {}
+            processed_connected: dict = {}
             for k, v in data.items():
                 if k in ['id', 'created_at']:
                     continue
@@ -112,10 +114,10 @@ def generalize_agent_dict(data: dict, agent_client: AgentsClient, prefix: str = 
                     nested = generalize_agent_dict(v, agent_client, prefix, suffix)
                     if isinstance(nested, dict):
                         nested['name_from_id'] = trim_agent_name(agent_name, prefix, suffix) if agent_name else "Unknown Agent"
-                    processed[k] = nested
+                    processed_connected[k] = nested
                 else:
-                    processed[k] = generalize_agent_dict(v, agent_client, prefix, suffix)
-            result = processed
+                    processed_connected[k] = generalize_agent_dict(v, agent_client, prefix, suffix)
+            result = processed_connected
         else:
             processed: dict = {}
             for k, v in data.items():
@@ -133,7 +135,13 @@ def generalize_agent_dict(data: dict, agent_client: AgentsClient, prefix: str = 
 
     return result
 
-def download_agents(agent_client: AgentsClient, file_path: str | None = None, prefix: str = "", suffix: str = "", format: str = "json") -> bool:
+def download_agents(
+    agent_client: SupportsAgents,
+    file_path: Optional[str] = None,
+    prefix: str = "",
+    suffix: str = "",
+    format: str = "json"
+) -> bool:
     """Download all (optionally filtered) agents to files.
 
     Agents are filtered by prefix and suffix (both must match if provided) and
@@ -197,7 +205,14 @@ def download_agents(agent_client: AgentsClient, file_path: str | None = None, pr
 
     return success
 
-def download_agent(agent_name: str, agent_client: AgentsClient, file_path: str | None = None, prefix: str = "", suffix: str = "", format: str = "json") -> bool:
+def download_agent(
+    agent_name: str,
+    agent_client: SupportsAgents,
+    file_path: Optional[str] = None,
+    prefix: str = "",
+    suffix: str = "",
+    format: str = "json"
+) -> bool:
     """Download a single agent definition to a file.
 
     Args:

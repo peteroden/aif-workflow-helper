@@ -116,17 +116,14 @@ from aif_workflow_helper import (
     create_or_update_agent_from_file,
     create_or_update_agents_from_files,
 )
-from azure.ai.agents import AgentsClient
-from azure.identity import DefaultAzureCredential
+from aif_workflow_helper.core.agent_framework_client import AgentFrameworkAgentsClient
 
 configure_logging()
 
-client = AgentsClient(
-    credential=DefaultAzureCredential(
-        exclude_interactive_browser_credential=False,
-        interactive_tenant_id="your-tenant-id"
-    ),
-    endpoint="your-endpoint"
+client = AgentFrameworkAgentsClient(
+  project_endpoint="your-endpoint",
+  tenant_id="your-tenant-id",
+  model_deployment_name="your-model-deployment",
 )
 
 # Bulk download
@@ -135,6 +132,16 @@ download_agents(client, file_path="./agents", prefix="", suffix="", format="json
 # Create/update from a directory (dependency ordered)
 create_or_update_agents_from_files(path="./agents", agent_client=client, prefix="", suffix="", format="json")
 ```
+
+### 5. Architecture & Client Abstraction
+
+The codebase intentionally depends on a *structural protocol* (`SupportsAgents`) instead of the concrete Azure SDK `AgentsClient`. A lightweight synchronous wrapper `AgentFrameworkAgentsClient` adapts the Agent Framework (async) SDK to this protocol. This yields:
+
+- Decoupling: Core upload/download/delete logic only relies on the handful of methods it needs (`list_agents`, `create_agent`, `update_agent`, `get_agent`, `delete_agent`).
+- Testability: In-memory test doubles implement the protocol without inheriting from any SDK classes.
+- Forward Migration: An eventual shift to native async (e.g. an `AsyncSupportsAgents` protocol) can happen without rewriting business logic.
+
+If you want to provide your own backend, implement the same method names and return objects exposing `id`, `name`, and `as_dict()`.
 
 ## 📁 What the Tooling Does
 

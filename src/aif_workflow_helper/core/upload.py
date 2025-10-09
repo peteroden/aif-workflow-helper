@@ -1,6 +1,7 @@
 from collections import defaultdict
 from pathlib import Path
-from azure.ai.agents import AgentsClient, models
+from typing import Optional
+from aif_workflow_helper.core.types import AgentLike
 from aif_workflow_helper.utils.validation import validate_agent_name
 from aif_workflow_helper.core.formats import get_file_extension, get_alternative_extensions
 from aif_workflow_helper.utils.logging import logger
@@ -8,6 +9,7 @@ from aif_workflow_helper.core.transformers.filesystem import (
     load_agent_from_file,
     load_agents_from_directory,
 )
+from aif_workflow_helper.core.types import SupportsAgents
 
 def read_agent_file(file_path: str) -> dict | None:
     """Read a single agent file in any supported format.
@@ -150,7 +152,14 @@ def _prepare_agent_data_for_azure(agent_data: dict, existing_agents: list, prefi
     
     return cleaned_data
 
-def create_or_update_agent(agent_data: dict, agent_client: AgentsClient, existing_agents: list[models.Agent] = None, prefix: str = "", suffix: str = "") -> models.Agent | None:
+
+def create_or_update_agent(
+    agent_data: dict,
+    agent_client: SupportsAgents,
+    existing_agents: Optional[list[AgentLike]] = None,
+    prefix: str = "",
+    suffix: str = ""
+) -> Optional[AgentLike]:
     """Create or update a single agent in Azure AI Foundry.
 
     Args:
@@ -163,7 +172,7 @@ def create_or_update_agent(agent_data: dict, agent_client: AgentsClient, existin
     Returns:
         Created or updated Agent instance, or None on failure.
     """
-    agent: models.Agent | None = None
+    agent: AgentLike | None = None
     
     try:
         agent_name = agent_data.get("name")
@@ -206,7 +215,7 @@ def create_or_update_agent(agent_data: dict, agent_client: AgentsClient, existin
     
     return agent
 
-def create_or_update_agents(agents_data: dict, agent_client: AgentsClient, prefix: str="", suffix: str="") -> None:
+def create_or_update_agents(agents_data: dict, agent_client: SupportsAgents, prefix: str="", suffix: str="") -> None:
     """Create or update multiple agents with dependency-aware ordering.
 
     Args:
@@ -225,8 +234,8 @@ def create_or_update_agents(agents_data: dict, agent_client: AgentsClient, prefi
     sorted_agent_names = dependency_sort(agents_data)
     
     # Get existing agents once for efficiency
-    existing_agents = list(agent_client.list_agents())
-    created_agents = []
+    existing_agents: list[AgentLike] = list(agent_client.list_agents())
+    created_agents: list[AgentLike] = []
 
     for i, agent_name in enumerate(sorted_agent_names, 1):
         logger.info(f"Processing {i}/{len(sorted_agent_names)}: {agent_name}")
@@ -249,7 +258,7 @@ def create_or_update_agents(agents_data: dict, agent_client: AgentsClient, prefi
 
     logger.info(f"Completed! Processed {len(created_agents)} agents successfully.")
 
-def create_or_update_agents_from_files(path: str, agent_client: AgentsClient, prefix: str="", suffix: str="", format: str="json") -> None:
+def create_or_update_agents_from_files(path: str, agent_client: SupportsAgents, prefix: str="", suffix: str="", format: str="json") -> None:
     """Load agent files from a directory and create/update them.
 
     Args:
@@ -260,27 +269,29 @@ def create_or_update_agents_from_files(path: str, agent_client: AgentsClient, pr
         format: Format of the files to read (json, yaml, md).
     """
 
-    agents_dir = Path(path)
+    if isinstance(path, Path):
+        agents_dir = path
+    else:
+        agents_dir = Path(str(path))
     if not agents_dir.exists() or not agents_dir.is_dir():
         logger.error(f"ERROR: Agents directory not found: {agents_dir}")
         raise ValueError(f"ERROR: Agents directory not found: {agents_dir}")
 
     try:
         logger.info("Reading agent files...")
-        agents_data = read_agent_files(agents_dir, format)
+        agents_data = read_agent_files(str(agents_dir), format)
         logger.info(f"Found {len(agents_data)} agents")
-        
+
         if agents_data:
             logger.info("Creating/updating agents...")
             create_or_update_agents(agents_data, agent_client, prefix, suffix)
         else:
             logger.info("No agent files found to process")
-            
     except Exception as e:
         logger.error(f"Error uploading agent files: {e}")
         raise ValueError(f"Error uploading agent files: {e}")
 
-def create_or_update_agent_from_file(agent_name: str, path: str, agent_client: AgentsClient, prefix: str="", suffix: str="", format: str="json") -> None:
+def create_or_update_agent_from_file(agent_name: str, path: str, agent_client: SupportsAgents, prefix: str="", suffix: str="", format: str="json") -> None:
     """Create or update a single agent from a file.
 
     Args:
@@ -293,16 +304,20 @@ def create_or_update_agent_from_file(agent_name: str, path: str, agent_client: A
     """
     # Get the file extension for the format
     extension = get_file_extension(format)
-    file_path = Path(f"{path}/{agent_name}{extension}")
-    
+    if isinstance(path, Path):
+        base_path = path
+    else:
+        base_path = Path(str(path))
+    file_path = base_path / f"{agent_name}{extension}"
+
     # Try alternative extensions if the primary one doesn't exist
     if not file_path.exists():
         for alt_ext in get_alternative_extensions(format):
-            alt_file_path = Path(f"{path}/{agent_name}{alt_ext}")
+            alt_file_path = base_path / f"{agent_name}{alt_ext}"
             if alt_file_path.exists():
                 file_path = alt_file_path
                 break
-    
+
     agent_dict = read_agent_file(str(file_path))
     if agent_dict:
         create_or_update_agent(agent_data=agent_dict, agent_client=agent_client, prefix=prefix, suffix=suffix)

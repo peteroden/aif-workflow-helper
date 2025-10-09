@@ -52,3 +52,17 @@ Source = "https://github.com/peteroden/aif-workflow-helper"
 # Console script entry points
 [project.scripts]
 aif-workflow-helper = "aif_workflow_helper.cli.main:main"
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+strict_optional = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+show_error_codes = true
+pretty = true
+

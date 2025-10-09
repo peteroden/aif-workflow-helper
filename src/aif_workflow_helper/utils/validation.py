@@ -5,7 +5,7 @@ from aif_workflow_helper.utils.logging import logger
 
 __all__ = ["validate_agent_name"]
 
-def validate_agent_name(agent_name: str):
+def validate_agent_name(agent_name: str) -> None:
     """Validate an agent name.
 
     Ensures the provided `agent_name` consists only of ASCII letters (A-Z, a-z),

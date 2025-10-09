@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 
 import yaml
 
@@ -46,7 +46,7 @@ def _resolve_format_from_extension(extension: str) -> Optional[str]:
     return None
 
 
-def _get_loader(format_name: str):
+def _get_loader(format_name: str) -> Any:
     loader = _FORMAT_LOADERS.get(format_name)
     if loader is None and registry.get_by_format(format_name) is None:
         logger.error(
@@ -57,7 +57,7 @@ def _get_loader(format_name: str):
     return loader
 
 
-def _get_saver(format_name: str):
+def _get_saver(format_name: str) -> Any:
     saver = _FORMAT_SAVERS.get(format_name)
     if saver is None and registry.get_by_format(format_name) is None:
         logger.error(
@@ -68,7 +68,7 @@ def _get_saver(format_name: str):
     return saver
 
 
-def _get_transformer(format_name: str):
+def _get_transformer(format_name: str) -> Any:
     transformer = registry.get_by_format(format_name)
     if transformer is None:
         logger.error("No transformer registered for format '%s'", format_name)
@@ -121,7 +121,7 @@ def load_agents_from_directory(directory: Path | str, format_name: str) -> Dict[
     files = list(directory_path.glob(pattern))
 
     # Include additional extensions (e.g., .yml) if configured.
-    for extension in _FORMAT_EXTENSIONS.get(format_name, ()):  # type: ignore[arg-type]
+    for extension in _FORMAT_EXTENSIONS.get(format_name, ()): 
         if extension == EXTENSION_MAP.get(format_name):
             continue
         files.extend(directory_path.glob(f"*{extension}"))

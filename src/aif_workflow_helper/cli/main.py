@@ -12,6 +12,7 @@ from aif_workflow_helper.core.download import download_agent, download_agents, g
 from aif_workflow_helper.core.delete import delete_agent_by_name, delete_agents, get_matching_agents
 from aif_workflow_helper.core.formats import SUPPORTED_FORMATS
 from aif_workflow_helper.core.agent_framework_client import AgentFrameworkAgentsClient
+from aif_workflow_helper.core.types import SupportsAgents
 from aif_workflow_helper.utils.logging import configure_logging, logger
 
 def process_args() -> argparse.Namespace:
@@ -178,11 +179,18 @@ def get_agent_client(args: argparse.Namespace) -> AgentFrameworkAgentsClient:
         )
         sys.exit(1)
 
-    return AgentFrameworkAgentsClient(
+    client = AgentFrameworkAgentsClient(
         project_endpoint=endpoint,
         tenant_id=tenant_id,
         model_deployment_name=model_deployment,
     )
+    # Development-time structural assertion (skipped if patched/mocked in tests)
+    try:  # pragma: no cover - defensive
+        if not isinstance(client, SupportsAgents):  # type: ignore[arg-type]
+            logger.debug("Client does not structurally satisfy SupportsAgents at runtime")
+    except Exception:  # pragma: no cover
+        pass
+    return client
 
 def handle_download_agent_arg(args: argparse.Namespace, agent_client: AgentFrameworkAgentsClient) -> None:
     if args.download_agent != "":

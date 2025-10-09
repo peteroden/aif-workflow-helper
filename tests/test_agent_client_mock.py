@@ -1,13 +1,8 @@
-"""
-Mock implementation of azure.ai.agents.AgentsClient for test isolation.
+"""In‑memory implementation of the SupportsAgents protocol for tests.
 
-Covers the subset of behavior required by this project:
-- create_agent(**kwargs)
-- update_agent(**kwargs)
-- list_agents()
-- get_agent(agent_id)
-
-Agent objects expose attributes: id, name, tools (list) and any extra kwargs.
+Provides only the subset of behavior required by the core upload/download
+flows, independent of any concrete Azure SDK client. Returned agent objects
+expose ``id``, ``name``, ``tools`` and preserve arbitrary extra kwargs.
 """
 
 from __future__ import annotations
@@ -44,14 +39,7 @@ class MockAgent:
 
 
 class AgentsClientMock:
-    """
-    In-memory mock of AgentsClient.
-
-    Usage:
-        client = AgentsClientMock()
-        agent = client.create_agent(name="agent-a", tools=[...])
-        for a in client.list_agents(): ...
-    """
+    """Lightweight synchronous test double implementing SupportsAgents."""
 
     def __init__(self):
         self._agents_by_id: Dict[str, MockAgent] = {}

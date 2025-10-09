@@ -1,6 +1,8 @@
-"""Logging utilities for aif_workflow_helpers package."""
 
+
+"""Logging utilities for aif_workflow_helpers package."""
 import logging
+from typing import Optional, IO, Any
 
 LOGGER_NAME = "aif_workflow_helpers"
 _logger = logging.getLogger(LOGGER_NAME)
@@ -9,8 +11,9 @@ _DEFAULT_FORMAT = "%(asctime)s %(levelname)s %(name)s - %(message)s"
 
 _configured = False
 
+
 def configure_logging(level: int = logging.INFO, *, propagate: bool = False, force: bool = False,
-                      fmt: str = _DEFAULT_FORMAT, stream=None) -> logging.Logger:
+                      fmt: str = _DEFAULT_FORMAT, stream: Optional[IO[Any]] = None) -> logging.Logger:
     """Configure and return the shared package logger.
 
     Idempotently initializes the module-level logger used across helper modules.

@@ -1,6 +1,5 @@
 from typing import List, Tuple
-from azure.ai.agents import AgentsClient
-from azure.ai.agents.models import Agent
+from aif_workflow_helper.core.types import SupportsAgents, AgentLike
 
 from aif_workflow_helper.utils.logging import logger
 from aif_workflow_helper.utils.validation import validate_agent_name
@@ -9,7 +8,7 @@ from aif_workflow_helper.core.download import get_agent_by_name
 
 def delete_agent_by_name(
     agent_name: str,
-    agent_client: AgentsClient,
+    agent_client: SupportsAgents,
     prefix: str = "",
     suffix: str = ""
 ) -> bool:
@@ -45,10 +44,10 @@ def delete_agent_by_name(
 
 
 def get_matching_agents(
-    agent_client: AgentsClient,
+    agent_client: SupportsAgents,
     prefix: str = "",
     suffix: str = ""
-) -> List[Agent]:
+    ) -> List[AgentLike]:
     """Get all agents matching the prefix/suffix filter.
     
     Args:
@@ -77,8 +76,8 @@ def get_matching_agents(
 
 
 def delete_agents(
-    agent_client: AgentsClient,
-    agent_list: List[Agent]
+    agent_client: SupportsAgents,
+    agent_list: List[AgentLike]
 ) -> Tuple[bool, int]:
     """Delete a list of agents.
     
