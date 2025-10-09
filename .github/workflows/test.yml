@@ -52,6 +52,11 @@ jobs:
         uv pip install --system ruff
         ruff check . --output-format=github
 
+    - name: Type check with mypy
+      run: |
+        uv pip install --system mypy types-PyYAML
+        mypy src/
+
     - name: Test with pytest
       run: |
         uv pip install --system coverage

@@ -129,6 +129,6 @@ class AgentFrameworkAgentsClient:
         self._ensure_client()
         return self
 
-    def __exit__(self, exc_type, exc, exc_tb) -> None:
+    def __exit__(self, exc_type: Any, exc: Any, exc_tb: Any) -> None:
         """Ensure resources are released when the context exits."""
         self.close()

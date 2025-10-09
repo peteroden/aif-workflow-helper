@@ -142,7 +142,7 @@ def setup_logging(log_level_name: str) -> None:
             if not isinstance(level, int):
                 level = None
         
-        configure_logging(level=level, propagate=True)
+        configure_logging(level=level if level is not None else 20, propagate=True)
     except Exception:  # pragma: no cover
         configure_logging()
 
@@ -186,7 +186,7 @@ def get_agent_client(args: argparse.Namespace) -> AgentFrameworkAgentsClient:
     )
     # Development-time structural assertion (skipped if patched/mocked in tests)
     try:  # pragma: no cover - defensive
-        if not isinstance(client, SupportsAgents):  # type: ignore[arg-type]
+        if not isinstance(client, SupportsAgents):
             logger.debug("Client does not structurally satisfy SupportsAgents at runtime")
     except Exception:  # pragma: no cover
         pass
@@ -203,7 +203,7 @@ def handle_download_agent_arg(args: argparse.Namespace, agent_client: AgentFrame
             logger.info(f"Connected. Found {len(agents)} existing agents")
 
             logger.info(f"Downloading agent {agent_name}...")
-            download_agent(agent_name=agent_name, agent_client=agent_client,file_path=agents_dir,prefix=args.prefix,suffix=args.suffix,format=args.format)
+            download_agent(agent_name=agent_name, agent_client=agent_client,file_path=str(agents_dir),prefix=args.prefix,suffix=args.suffix,format=args.format)
         except Exception as e:
             logger.error(f"Unhandled error in downloading agent: {e}")
     else:
@@ -218,7 +218,7 @@ def handle_download_all_agents_arg(args: argparse.Namespace, agent_client: Agent
         logger.info(f"Connected. Found {len(agents)} existing agents")
 
         logger.info("Downloading agents...")
-        download_agents(agent_client, file_path=agents_dir, prefix=args.prefix, suffix=args.suffix, format=args.format)
+        download_agents(agent_client, file_path=str(agents_dir), prefix=args.prefix, suffix=args.suffix, format=args.format)
     except Exception as e:
         logger.error(f"Unhandled error in downloading agents: {e}")
 
@@ -231,7 +231,7 @@ def handle_upload_agent_arg(args: argparse.Namespace, agent_client: AgentFramewo
     agent_name = args.upload_agent
 
     try:
-        create_or_update_agent_from_file(agent_name=agent_name, path=agents_dir, agent_client=agent_client, prefix=args.prefix, suffix=args.suffix, format=args.format)
+        create_or_update_agent_from_file(agent_name=agent_name, path=str(agents_dir), agent_client=agent_client, prefix=args.prefix, suffix=args.suffix, format=args.format)
     except Exception as e:
         logger.error(f"Error uploading agent {agent_name}: {e}")
 
@@ -242,8 +242,7 @@ def handle_upload_all_agents_arg(args: argparse.Namespace, agent_client: AgentFr
         sys.exit(1)
 
     try:
-        create_or_update_agents_from_files(path=agents_dir, agent_client=agent_client, prefix=args.prefix, suffix=args.suffix, format=args.format)
-
+        create_or_update_agents_from_files(path=str(agents_dir), agent_client=agent_client, prefix=args.prefix, suffix=args.suffix, format=args.format)
     except Exception as e:
         logger.error(f"Error uploading agent files: {e}")
 
@@ -330,7 +329,7 @@ def handle_delete_all_agents_arg(args: argparse.Namespace, agent_client: AgentFr
         logger.error(f"Error during bulk deletion: {e}")
         sys.exit(1)
 
-def main():
+def main() -> None:
     args = process_args()
 
     setup_logging(log_level_name=args.log_level)

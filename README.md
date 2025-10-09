@@ -135,13 +135,24 @@ create_or_update_agents_from_files(path="./agents", agent_client=client, prefix=
 
 ### 5. Architecture & Client Abstraction
 
+This project uses modern Python architecture patterns for maintainability and extensibility:
+
+#### Protocol-Based Design
+
 The codebase intentionally depends on a *structural protocol* (`SupportsAgents`) instead of the concrete Azure SDK `AgentsClient`. A lightweight synchronous wrapper `AgentFrameworkAgentsClient` adapts the Agent Framework (async) SDK to this protocol. This yields:
 
-- Decoupling: Core upload/download/delete logic only relies on the handful of methods it needs (`list_agents`, `create_agent`, `update_agent`, `get_agent`, `delete_agent`).
-- Testability: In-memory test doubles implement the protocol without inheriting from any SDK classes.
-- Forward Migration: An eventual shift to native async (e.g. an `AsyncSupportsAgents` protocol) can happen without rewriting business logic.
+- **Decoupling**: Core upload/download/delete logic only relies on the handful of methods it needs (`list_agents`, `create_agent`, `update_agent`, `get_agent`, `delete_agent`).
+- **Testability**: In-memory test doubles implement the protocol without inheriting from any SDK classes.
+- **Forward Migration**: An eventual shift to native async (e.g. an `AsyncSupportsAgents` protocol) can happen without rewriting business logic.
 
 If you want to provide your own backend, implement the same method names and return objects exposing `id`, `name`, and `as_dict()`.
+
+#### Type Safety & Code Quality
+
+- **Full Type Annotations**: All functions and methods include complete type hints for improved IDE support and error detection
+- **Static Type Checking**: Configured with `mypy` for strict type checking (enforced in CI)
+- **Modern Linting**: Uses `ruff` for fast, comprehensive code quality checks
+- **Protocol Typing**: Leverages Python's structural subtyping for flexible yet type-safe interfaces
 
 ## 📁 What the Tooling Does
 
@@ -484,7 +495,7 @@ This project includes a comprehensive CI/CD pipeline using GitHub Actions that e
 
 - **Multi-Python Version Testing**: Tests on Python 3.10, 3.11, and 3.12
 - **Automated Testing**: Runs all pytest tests with coverage reporting
-- **Code Quality**: Includes linting with flake8
+- **Code Quality**: Includes linting with `ruff` and type checking with `mypy`
 - **Package Testing**: Verifies the package can be built and installed correctly
 - **CLI Testing**: Ensures the command-line interface works after installation
 
@@ -507,6 +518,12 @@ source .venv/bin/activate
 
 # Install with dev dependencies
 pip install -e .[dev]
+
+# Run type checking
+mypy src/
+
+# Run linting
+ruff check .
 
 # Run tests
 pytest tests/ -v --tb=short
