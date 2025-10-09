@@ -214,6 +214,103 @@ If you want to provide your own backend, implement the same method names and ret
 1. **CLI Parameters** (highest priority): `--azure-tenant-id`, `--project-endpoint`, and `--model-deployment-name`
 2. **Environment Variables** (fallback): `AZURE_TENANT_ID`, `AZURE_AI_PROJECT_ENDPOINT` (or legacy `PROJECT_ENDPOINT`), and `AZURE_AI_MODEL_DEPLOYMENT_NAME`
 
+## 🧠 Per-Agent Models & Retry Behavior
+
+### Model Resolution Order
+
+When creating or updating an agent the model deployment used follows this precedence:
+
+1. Explicit model defined inside the agent definition file (JSON/YAML/Markdown) under `model`
+2. CLI parameter `--model-deployment-name`
+3. Environment variable `AZURE_AI_MODEL_DEPLOYMENT_NAME`
+4. Fallback placeholder value `default` (a warning is logged – you almost always want to supply a real deployment)
+
+This means you can mix strategies: set a global default via env/CLI and override only specific agents that require a specialized deployment.
+
+### Why Per-Agent Models Matter
+
+- Different capability tiers (e.g. reasoning vs standard) for different agents
+- Cost optimization – lightweight model for routing agents, larger model for planners
+- Incremental migration – trial a new deployment on a subset of agents before broad rollout
+
+### Retry & Resilience
+
+Transient Azure/network failures are automatically retried with exponential backoff. You can tune this without code changes:
+
+Environment variables:
+
+- `AIF_RETRY_ATTEMPTS` – Total retry attempts (default: 3)
+- `AIF_RETRY_BASE_DELAY` – Initial delay in seconds before first retry (default: 0.5)
+
+Backoff strategy roughly: `delay = base * (2 ** (attempt - 1)) + jitter`.
+
+Example tuning for slower environments:
+
+```bash
+export AIF_RETRY_ATTEMPTS=5
+export AIF_RETRY_BASE_DELAY=1.0
+```
+
+You will see INFO/WARNING logs indicating retry attempts and final failure if exhausted.
+
+### Recommended Practices
+
+- Always set a real model deployment globally (env or CLI)
+- Use per-agent overrides sparingly and document why the override exists
+- Monitor logs for the placeholder `default` warning – that usually signals a configuration gap
+
+## 🧩 Connected Agent Alias Normalization
+
+Agents may reference other agents via connected agent tools (dependencies). The service enforces an identifier-style pattern for alias names. To keep uploads resilient the tool automatically normalizes aliases:
+
+Normalization rules:
+
+- Any character not matching `[A-Za-z0-9_]` is replaced with `_`
+- Aliases are trimmed (no leading/trailing whitespace)
+- Multiple consecutive invalid characters collapse to single `_`
+- A leading digit is prefixed with `_` to satisfy identifier constraints
+
+Example transformations:
+
+| Original Alias        | Normalized Alias |
+|-----------------------|------------------|
+| `pricing-api`         | `pricing_api`    |
+| `customer-support`    | `customer_support` |
+| `orchestration@root`  | `orchestration_root` |
+| `123planner`          | `_123planner`    |
+| `chat/assist+core`    | `chat_assist_core` |
+
+### Resolution & Warnings
+
+During upload the tool attempts to resolve connected agents **by name (post prefix/suffix application)**. If an agent reference cannot be resolved:
+
+- A WARNING is logged: unresolved connected agent name
+- The unresolved reference is skipped (not fatal – allows partial graph deployment)
+
+To enforce strictness you can add a CI policy that fails on the presence of these warnings (future enhancement could introduce a `--strict-dependencies` flag).
+
+### Practical Tips
+
+- Keep aliases simple and service-friendly from the start to avoid renames
+- Use consistent naming conventions (e.g. snake_case) across your team
+- After a bulk download → modify → re-upload cycle, expect aliases to already appear normalized
+
+### Troubleshooting Unresolved Dependencies
+
+Common causes:
+
+- Misspelled agent name in the referencing agent file
+- Missing prefix/suffix when running upload compared to how agents were originally created
+- Upload order manipulated manually (let the bulk upload handle ordering)
+
+Fix strategy:
+
+1. Verify the target agent file exists in the directory
+2. Confirm the final computed name (prefix + base + suffix) matches what the reference expects
+3. Re-run with `--log-level DEBUG` to see raw dependency resolution steps
+
+If still unresolved, download existing agents and compare normalized names to your references.
+
 ## � Agent Lookup
 
 ### Get Agent ID by Name

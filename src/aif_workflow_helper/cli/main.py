@@ -172,12 +172,7 @@ def get_agent_client(args: argparse.Namespace) -> AgentFrameworkAgentsClient:
         args.model_deployment_name
         or os.getenv("AZURE_AI_MODEL_DEPLOYMENT_NAME")
     )
-    if not model_deployment:
-        logger.error(
-            "Model deployment name is required. Provide it via --model-deployment-name "
-            "or AZURE_AI_MODEL_DEPLOYMENT_NAME environment variable",
-        )
-        sys.exit(1)
+    # model_deployment is now optional - models can be specified per agent in files
 
     client = AgentFrameworkAgentsClient(
         project_endpoint=endpoint,
@@ -348,8 +343,11 @@ def main() -> None:
     )
 
     try:
-        if operations_requested:
-            agent_client = get_agent_client(args)
+        if not operations_requested:
+            logger.info("No operation specified. Use --help to see available commands.")
+            return
+
+        agent_client = get_agent_client(args)
 
         if args.download_agent and agent_client:
             handle_download_agent_arg(args=args, agent_client=agent_client)

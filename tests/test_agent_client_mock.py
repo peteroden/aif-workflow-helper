@@ -37,6 +37,10 @@ class MockAgent:
         base.update(self._extra)
         return base
 
+    # Azure SDK objects expose as_dict(); provide compatibility alias.
+    def as_dict(self) -> Dict[str, Any]:  # pragma: no cover - trivial wrapper
+        return self.to_dict()
+
 
 class AgentsClientMock:
     """Lightweight synchronous test double implementing SupportsAgents."""

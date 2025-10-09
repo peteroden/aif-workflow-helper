@@ -1,10 +1,14 @@
-"""
-Shared test fixtures and configuration for the aif_workflow_helpers tests.
-"""
+
 
 import pytest
 from unittest.mock import Mock
 from azure.ai.agents import models
+from .test_agent_client_mock import AgentsClientMock
+
+@pytest.fixture
+def agents_client_mock():
+    """Fixture providing a fresh AgentsClientMock for each test."""
+    return AgentsClientMock()
 
 
 @pytest.fixture
@@ -176,6 +180,47 @@ def agents_data_with_dependencies():
             "metadata": {}
         }
     }
+
+
+@pytest.fixture
+def mock_cli_agent_client():
+    """Create a unified mock AgentFrameworkAgentsClient for CLI handler testing.
+    
+    This fixture provides a pre-configured mock client that covers all the
+    common CLI handler scenarios. Tests can override specific behaviors
+    by modifying the returned mock or its methods.
+    """
+    client = Mock()
+    
+    # Mock common methods used by CLI handlers
+    client.list_agents = Mock(return_value=[])
+    client.get_agent = Mock(return_value=None)
+    client.create_agent = Mock()
+    client.update_agent = Mock()
+    client.delete_agent = Mock()
+    client.close = Mock()
+    
+    # Create sample agents for testing scenarios
+    sample_agent = Mock()
+    sample_agent.id = "asst_test123"
+    sample_agent.name = "test-agent"
+    
+    sample_agent_with_prefix = Mock()
+    sample_agent_with_prefix.id = "asst_test456"
+    sample_agent_with_prefix.name = "dev-test-agent-v1"
+    
+    # Configure client to return sample data when needed
+    client._sample_agent = sample_agent
+    client._sample_agent_with_prefix = sample_agent_with_prefix
+    
+    # Add helper method to easily configure list_agents response
+    def set_agents_list(agents):
+        """Helper to set the list of agents returned by list_agents()."""
+        client.list_agents.return_value = agents
+    
+    client.set_agents_list = set_agents_list
+    
+    return client
 
 
 @pytest.fixture

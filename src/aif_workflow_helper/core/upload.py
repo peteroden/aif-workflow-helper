@@ -54,7 +54,7 @@ def extract_dependencies(agents_data: dict) -> defaultdict:
                 if not isinstance(connected_agent_data, dict):
                     logger.debug(f"Agent '{agent_name}' connected_agent not a dict; skipping")
                     continue
-                dependency_name = connected_agent_data.get('name_from_id')
+                dependency_name = connected_agent_data.get('name_from_id') or connected_agent_data.get('name')
                 if dependency_name and dependency_name != "Unknown Agent":
                     dependencies[agent_name].add(dependency_name)
                     logger.debug(f"{agent_name} depends on {dependency_name}")
@@ -129,16 +129,50 @@ def _prepare_agent_data_for_azure(agent_data: dict, existing_agents: list, prefi
         for tool in cleaned_data["tools"]:
             if isinstance(tool, dict) and tool.get("type") == "connected_agent":
                 connected_data = tool.get("connected_agent", {})
-                if "name_from_id" in connected_data:
-                    # Find the agent ID by name
-                    dep_name = connected_data["name_from_id"]
-                    # Apply prefix/suffix to find the actual agent name
-                    dep_full_name = f"{prefix}{dep_name}{suffix}"
-                    for existing in existing_agents:
-                        if existing.name == dep_full_name:
-                            connected_data["id"] = existing.id
-                            del connected_data["name_from_id"]
+                alias_name = connected_data.get("name")
+                exported_name = connected_data.get("name_from_id")
+
+                # For ID resolution, prefer exported_name (actual agent resource name), then alias
+                resolution_candidates: list[str] = []
+                if exported_name:
+                    resolution_candidates.append(exported_name)
+                if alias_name and alias_name not in resolution_candidates:
+                    resolution_candidates.append(alias_name)
+
+                # Restore correct alias logic:
+                # - If only name_from_id is present, generate a valid alias (letters and underscores only)
+                # - Azure API requires pattern ^[a-zA-Z_]+$ for connected agent name
+                if exported_name and not alias_name:
+                    # Try to get original agent name from metadata (if present)
+                    original_name = connected_data.get("original_name")
+                    if original_name:
+                        safe_alias = ''.join(ch if ch.isalpha() else '_' for ch in original_name)
+                    else:
+                        # Convert name_from_id to valid alias: letters only, replace everything else with _
+                        safe_alias = ''.join(ch if ch.isalpha() else '_' for ch in exported_name)
+                    connected_data["name"] = safe_alias or "connected"
+
+                if "id" not in connected_data:
+                    for candidate in resolution_candidates:
+                        dep_full_name = f"{prefix}{candidate}{suffix}"
+                        for existing in existing_agents:
+                            if existing.name == dep_full_name:
+                                connected_data["id"] = existing.id
+                                break
+                        if "id" in connected_data:
                             break
+                    if "id" not in connected_data:
+                        logger.warning(
+                            "Unable to resolve connected agent '%s' (candidates=%s) for parent '%s' – upload may fail.",
+                            exported_name or alias_name,
+                            resolution_candidates,
+                            agent_data.get("name"),
+                        )
+                # Remove name_from_id and original_name before sending to service (not accepted fields)
+                if "name_from_id" in connected_data:
+                    connected_data.pop("name_from_id", None)
+                if "original_name" in connected_data:
+                    connected_data.pop("original_name", None)
     
     # Remove empty tool_resources - Azure expects None or proper ToolResources object
     if "tool_resources" in cleaned_data and not cleaned_data["tool_resources"]:
@@ -178,6 +212,13 @@ def create_or_update_agent(
         agent_name = agent_data.get("name")
         if not agent_name:
             logger.error("Agent data missing 'name' field")
+            return agent
+        # Basic required fields validation (model, instructions)
+        if not agent_data.get("model"):
+            logger.error("Agent '%s' missing required 'model' field", agent_name)
+            return agent
+        if not agent_data.get("instructions"):
+            logger.error("Agent '%s' missing required 'instructions' field", agent_name)
             return agent
 
         # Apply prefix/suffix to the name
@@ -317,7 +358,13 @@ def create_or_update_agent_from_file(agent_name: str, path: str, agent_client: S
             if alt_file_path.exists():
                 file_path = alt_file_path
                 break
+    if not file_path.exists():
+        logger.error("Agent file not found for '%s' (searched %s + alternatives)", agent_name, file_path)
+        raise FileNotFoundError(f"Agent file not found for '{agent_name}'")
 
     agent_dict = read_agent_file(str(file_path))
     if agent_dict:
         create_or_update_agent(agent_data=agent_dict, agent_client=agent_client, prefix=prefix, suffix=suffix)
+    else:
+        logger.error("Failed to read agent file for '%s' at %s", agent_name, file_path)
+        raise ValueError(f"Failed to read agent file for '{agent_name}'")

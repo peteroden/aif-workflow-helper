@@ -1,6 +1,8 @@
 # Mac finder files
 .DS_Store
 
+.env
+
 # Generated PR from Copilot
 pr.md
 pr-reference.xml

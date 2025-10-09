@@ -20,6 +20,10 @@ def validate_agent_name(agent_name: str) -> None:
         ValueError: If the name contains characters other than letters,
             digits, or hyphens.
     """
+    # Edge case: Disallow empty string as a valid agent name
+    if not agent_name:
+        logger.error("Agent name cannot be empty.")
+        raise ValueError("Agent name cannot be empty.")
     if not re.match(r"^[a-zA-Z0-9-]*$", agent_name):
         logger.error(
             f"Invalid agent name '{agent_name}'; only letters, numbers, and hyphens are allowed."

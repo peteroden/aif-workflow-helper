@@ -11,47 +11,41 @@ def make_agent(name, as_dict=None):
     agent.as_dict.return_value = as_dict or {"name": name, "tools": []}
     return agent
 
-class DummyClient:
-    def __init__(self, agent=None):
-        self._agent = agent
-    def list_agents(self):
-        return [self._agent] if self._agent else []
-    def get_agent(self, agent_id):
-        return self._agent if self._agent and self._agent.name == agent_id else None
-    def get_agent_by_name(self, name):
-        return self._agent if self._agent and self._agent.name == name else None
+
 
 @patch("builtins.open", new_callable=MagicMock)
-def test_download_agent_success(mock_open):
+def test_download_agent_success(mock_open, agents_client_mock):
     agent = make_agent("test-agent", {"name": "test-agent", "tools": []})
-    client = DummyClient(agent)
+    agents_client_mock._agents_by_id["test-agent"] = agent
+    agents_client_mock._name_index["test-agent"] = "test-agent"
     file_obj = io.StringIO()
     mock_open.return_value.__enter__.return_value = file_obj
-    download_agent("test-agent", client)
+    download_agent("test-agent", agents_client_mock)
     file_obj.seek(0)
     data = json.load(file_obj)
     assert data["name"] == "test-agent"
     assert "tools" in data
 
 @patch("builtins.open", new_callable=MagicMock)
-def test_download_agent_not_found(mock_open, caplog):
-    client = DummyClient(None)
-    download_agent("missing-agent", client)
+def test_download_agent_not_found(mock_open, caplog, agents_client_mock):
+    download_agent("missing-agent", agents_client_mock)
     assert any("not found" in m for m in caplog.messages)
     mock_open.assert_not_called()
 
 @patch("builtins.open", side_effect=OSError("fail"))
-def test_download_agent_file_error(mock_open, caplog):
+def test_download_agent_file_error(mock_open, caplog, agents_client_mock):
     agent = make_agent("fail-agent", {"name": "fail-agent", "tools": []})
-    client = DummyClient(agent)
-    download_agent("fail-agent", client)
+    agents_client_mock._agents_by_id["fail-agent"] = agent
+    agents_client_mock._name_index["fail-agent"] = "fail-agent"
+    download_agent("fail-agent", agents_client_mock)
     # Should log an error or warning, but not raise
     assert any("fail" in m for m in caplog.messages)
 
 
-def test_download_agent_directory_creation_failure(monkeypatch):
+def test_download_agent_directory_creation_failure(monkeypatch, agents_client_mock):
     agent = make_agent("test-agent", {"name": "test-agent", "tools": []})
-    client = DummyClient(agent)
+    agents_client_mock._agents_by_id["test-agent"] = agent
+    agents_client_mock._name_index["test-agent"] = "test-agent"
 
     monkeypatch.setattr(
         download_module.os,
@@ -59,14 +53,15 @@ def test_download_agent_directory_creation_failure(monkeypatch):
         MagicMock(side_effect=OSError("nope")),
     )
 
-    result = download_agent("test-agent", client, file_path="/tmp/out")
+    result = download_agent("test-agent", agents_client_mock, file_path="/tmp/out")
 
     assert result is False
 
 
-def test_download_agents_returns_false_when_save_fails(monkeypatch):
+def test_download_agents_returns_false_when_save_fails(monkeypatch, agents_client_mock):
     agent = make_agent("test-agent", {"name": "test-agent", "tools": []})
-    client = DummyClient(agent)
+    agents_client_mock._agents_by_id["test-agent"] = agent
+    agents_client_mock._name_index["test-agent"] = "test-agent"
 
     monkeypatch.setattr(
         download_module,
@@ -74,20 +69,18 @@ def test_download_agents_returns_false_when_save_fails(monkeypatch):
         MagicMock(return_value=False),
     )
 
-    result = download_agents(client, file_path="/tmp/out")
+    result = download_agents(agents_client_mock, file_path="/tmp/out")
 
     assert result is False
 
 
-def test_download_agent_returns_false_when_agent_missing(monkeypatch):
-    client = DummyClient(None)
-
+def test_download_agent_returns_false_when_agent_missing(monkeypatch, agents_client_mock):
     monkeypatch.setattr(
         download_module.os,
         "makedirs",
         MagicMock(),
     )
 
-    result = download_agent("unknown", client, file_path="/tmp/out")
+    result = download_agent("unknown", agents_client_mock, file_path="/tmp/out")
 
     assert result is False

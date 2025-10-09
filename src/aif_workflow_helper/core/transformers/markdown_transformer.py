@@ -32,8 +32,12 @@ class MarkdownAgentTransformer(AgentTransformer):
     def save(self, agent_dict: Dict[str, Any], path: Path) -> None:
         metadata = agent_dict.copy()
         content = metadata.pop("instructions", "")
+        # Ensure instructions always ends with a single trailing newline for roundtrip consistency
+        if not content.endswith("\n"):
+            content += "\n"
         post = frontmatter.Post(content, **metadata)
         markdown_content = frontmatter.dumps(post)
+        # Guarantee file ends with a single trailing newline (Unix convention)
         if not markdown_content.endswith("\n"):
             markdown_content += "\n"
         with open(path, "w", encoding="utf-8") as handle:
