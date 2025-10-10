@@ -1,4 +1,3 @@
-from typing import List, Tuple
 from aif_workflow_helper.core.types import SupportsAgents, AgentLike
 
 from aif_workflow_helper.utils.logging import logger
@@ -6,7 +5,7 @@ from aif_workflow_helper.utils.validation import validate_agent_name
 from aif_workflow_helper.core.download import get_agent_by_name
 
 
-def delete_agent_by_name(
+async def delete_agent_by_name(
     agent_name: str,
     agent_client: SupportsAgents,
     prefix: str = "",
@@ -27,15 +26,16 @@ def delete_agent_by_name(
     validate_agent_name(full_agent_name)
     
     try:
-        agent = get_agent_by_name(full_agent_name, agent_client)
+        agent = await get_agent_by_name(full_agent_name, agent_client)
         
         if not agent:
             logger.warning(f"Agent with name '{full_agent_name}' not found.")
             return False
         
         # Delete the agent
-        agent_client.delete_agent(agent.id)
-        logger.info(f"Successfully deleted agent '{full_agent_name}' (ID: {agent.id})")
+        logger.info(f"Deleting agent: {agent.name}")
+        await agent_client.delete_agent(agent.id)
+        logger.info(f"✓ Successfully deleted {agent.name}")
         return True
         
     except Exception as e:
@@ -43,24 +43,22 @@ def delete_agent_by_name(
         return False
 
 
-def get_matching_agents(
+async def get_matching_agents(
     agent_client: SupportsAgents,
     prefix: str = "",
     suffix: str = ""
-    ) -> List[AgentLike]:
-    """Get all agents matching the prefix/suffix filter.
-    
+) -> list[AgentLike]:
+    """Get all agents matching the given prefix and suffix.
+
     Args:
-        agent_client: Client used to list agents
-        prefix: Only include agents whose names start with this value
-        suffix: Only include agents whose names end with this value
-        
+        agent_client: Client used to list agents.
+        prefix: Only include agents whose names start with this value.
+        suffix: Only include agents whose names end with this value.
+
     Returns:
-        List of matching agent objects
+        List of matching agents.
     """
-    agent_list = list(agent_client.list_agents())
-    
-    # Filter agents by prefix and suffix
+    agent_list = list(await agent_client.list_agents())    # Filter agents by prefix and suffix
     # Only apply filters if they are non-empty strings
     matching_agents = []
     for agent in agent_list:
@@ -75,18 +73,18 @@ def get_matching_agents(
     return matching_agents
 
 
-def delete_agents(
+async def delete_agents(
     agent_client: SupportsAgents,
-    agent_list: List[AgentLike]
-) -> Tuple[bool, int]:
-    """Delete a list of agents.
-    
+    agent_list: list[AgentLike]
+) -> tuple[bool, int]:
+    """Delete multiple agents.
+
     Args:
-        agent_client: Client used to delete agents
-        agent_list: List of agent objects to delete
-        
+        agent_client: Client used to delete agents.
+        agent_list: List of agents to delete.
+
     Returns:
-        Tuple of (success: bool, deleted_count: int)
+        Tuple of (success, count_deleted).
     """
     if not agent_list:
         logger.info("No agents to delete.")
@@ -97,7 +95,7 @@ def delete_agents(
     
     for agent in agent_list:
         try:
-            agent_client.delete_agent(agent.id)
+            await agent_client.delete_agent(agent.id)
             logger.info(f"Deleted agent '{agent.name}' (ID: {agent.id})")
             deleted_count += 1
         except Exception as e:

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import asyncio
 import os
 import sys
 from pathlib import Path
@@ -11,7 +12,7 @@ from aif_workflow_helper.core.upload import create_or_update_agents_from_files, 
 from aif_workflow_helper.core.download import download_agent, download_agents, get_agent_by_name
 from aif_workflow_helper.core.delete import delete_agent_by_name, delete_agents, get_matching_agents
 from aif_workflow_helper.core.formats import SUPPORTED_FORMATS
-from aif_workflow_helper.core.agent_framework_client import AgentFrameworkAgentsClient
+from aif_workflow_helper.core.async_agent_client import AsyncAgentClient
 from aif_workflow_helper.core.types import SupportsAgents
 from aif_workflow_helper.utils.logging import configure_logging, logger
 
@@ -146,8 +147,8 @@ def setup_logging(log_level_name: str) -> None:
     except Exception:  # pragma: no cover
         configure_logging()
 
-def get_agent_client(args: argparse.Namespace) -> AgentFrameworkAgentsClient:
-    """Create the Agent Framework-backed client using CLI args or environment variables."""
+def get_agent_client(args: argparse.Namespace) -> AsyncAgentClient:
+    """Create the async Agent Framework-backed client using CLI args or environment variables."""
 
     tenant_id = args.azure_tenant_id or os.getenv("AZURE_TENANT_ID")
     if not tenant_id:
@@ -174,7 +175,7 @@ def get_agent_client(args: argparse.Namespace) -> AgentFrameworkAgentsClient:
     )
     # model_deployment is now optional - models can be specified per agent in files
 
-    client = AgentFrameworkAgentsClient(
+    client = AsyncAgentClient(
         project_endpoint=endpoint,
         tenant_id=tenant_id,
         model_deployment_name=model_deployment,
@@ -187,37 +188,37 @@ def get_agent_client(args: argparse.Namespace) -> AgentFrameworkAgentsClient:
         pass
     return client
 
-def handle_download_agent_arg(args: argparse.Namespace, agent_client: AgentFrameworkAgentsClient) -> None:
+async def handle_download_agent_arg(args: argparse.Namespace, agent_client: AsyncAgentClient) -> None:
     if args.download_agent != "":
         agents_dir = Path(args.agents_dir)
         agents_dir.mkdir(parents=True, exist_ok=True)
         try:
             agent_name = args.download_agent
             logger.info("Connecting...")
-            agents = list(agent_client.list_agents())
+            agents = list(await agent_client.list_agents())
             logger.info(f"Connected. Found {len(agents)} existing agents")
 
             logger.info(f"Downloading agent {agent_name}...")
-            download_agent(agent_name=agent_name, agent_client=agent_client,file_path=str(agents_dir),prefix=args.prefix,suffix=args.suffix,format=args.format)
+            await download_agent(agent_name=agent_name, agent_client=agent_client,file_path=str(agents_dir),prefix=args.prefix,suffix=args.suffix,format=args.format)
         except Exception as e:
             logger.error(f"Unhandled error in downloading agent: {e}")
     else:
         logger.info("Agent name not provided")
 
-def handle_download_all_agents_arg(args: argparse.Namespace, agent_client: AgentFrameworkAgentsClient) -> None:
+async def handle_download_all_agents_arg(args: argparse.Namespace, agent_client: AsyncAgentClient) -> None:
     agents_dir = Path(args.agents_dir)
     agents_dir.mkdir(parents=True, exist_ok=True)
     try:
         logger.info("Connecting...")
-        agents = list(agent_client.list_agents())
+        agents = list(await agent_client.list_agents())
         logger.info(f"Connected. Found {len(agents)} existing agents")
 
         logger.info("Downloading agents...")
-        download_agents(agent_client, file_path=str(agents_dir), prefix=args.prefix, suffix=args.suffix, format=args.format)
+        await download_agents(agent_client, file_path=str(agents_dir), prefix=args.prefix, suffix=args.suffix, format=args.format)
     except Exception as e:
         logger.error(f"Unhandled error in downloading agents: {e}")
 
-def handle_upload_agent_arg(args: argparse.Namespace, agent_client: AgentFrameworkAgentsClient) -> None:
+async def handle_upload_agent_arg(args: argparse.Namespace, agent_client: AsyncAgentClient) -> None:
     agents_dir = Path(args.agents_dir)
     if not agents_dir.exists() or not agents_dir.is_dir():
         logger.error(f"Agents directory not found: {agents_dir}")
@@ -226,22 +227,22 @@ def handle_upload_agent_arg(args: argparse.Namespace, agent_client: AgentFramewo
     agent_name = args.upload_agent
 
     try:
-        create_or_update_agent_from_file(agent_name=agent_name, path=str(agents_dir), agent_client=agent_client, prefix=args.prefix, suffix=args.suffix, format=args.format)
+        await create_or_update_agent_from_file(agent_name=agent_name, path=str(agents_dir), agent_client=agent_client, prefix=args.prefix, suffix=args.suffix, format=args.format)
     except Exception as e:
         logger.error(f"Error uploading agent {agent_name}: {e}")
 
-def handle_upload_all_agents_arg(args: argparse.Namespace, agent_client: AgentFrameworkAgentsClient) -> None:
+async def handle_upload_all_agents_arg(args: argparse.Namespace, agent_client: AsyncAgentClient) -> None:
     agents_dir = Path(args.agents_dir)
     if not agents_dir.exists() or not agents_dir.is_dir():
         logger.error(f"Agents directory not found: {agents_dir}")
         sys.exit(1)
 
     try:
-        create_or_update_agents_from_files(path=str(agents_dir), agent_client=agent_client, prefix=args.prefix, suffix=args.suffix, format=args.format)
+        await create_or_update_agents_from_files(path=str(agents_dir), agent_client=agent_client, prefix=args.prefix, suffix=args.suffix, format=args.format)
     except Exception as e:
         logger.error(f"Error uploading agent files: {e}")
 
-def handle_get_agent_id_arg(args: argparse.Namespace, agent_client: AgentFrameworkAgentsClient) -> None:
+async def handle_get_agent_id_arg(args: argparse.Namespace, agent_client: AsyncAgentClient) -> None:
     agent_name = args.get_agent_id
     if not agent_name:
         logger.error("Agent name is required for --get-agent-id")
@@ -249,7 +250,7 @@ def handle_get_agent_id_arg(args: argparse.Namespace, agent_client: AgentFramewo
 
     try:
         logger.info(f"Looking up agent: {agent_name}")
-        agent = get_agent_by_name(agent_name=agent_name, agent_client=agent_client)
+        agent = await get_agent_by_name(agent_name=agent_name, agent_client=agent_client)
         
         if agent:
             print(agent.id)
@@ -261,7 +262,7 @@ def handle_get_agent_id_arg(args: argparse.Namespace, agent_client: AgentFramewo
         logger.error(f"Error getting agent ID for '{agent_name}': {e}")
         sys.exit(1)
 
-def handle_delete_agent_arg(args: argparse.Namespace, agent_client: AgentFrameworkAgentsClient) -> None:
+async def handle_delete_agent_arg(args: argparse.Namespace, agent_client: AsyncAgentClient) -> None:
     agent_name = args.delete_agent
     if not agent_name:
         logger.error("Agent name is required for --delete-agent")
@@ -276,7 +277,7 @@ def handle_delete_agent_arg(args: argparse.Namespace, agent_client: AgentFramewo
                 logger.info("Deletion cancelled by user.")
                 sys.exit(0)
         
-        success = delete_agent_by_name(
+        success = await delete_agent_by_name(
             agent_name=agent_name,
             agent_client=agent_client,
             prefix=args.prefix,
@@ -288,14 +289,14 @@ def handle_delete_agent_arg(args: argparse.Namespace, agent_client: AgentFramewo
         logger.error(f"Error deleting agent '{agent_name}': {e}")
         sys.exit(1)
 
-def handle_delete_all_agents_arg(args: argparse.Namespace, agent_client: AgentFrameworkAgentsClient) -> None:
+async def handle_delete_all_agents_arg(args: argparse.Namespace, agent_client: AsyncAgentClient) -> None:
     try:
         logger.info("Connecting...")
-        all_agents = list(agent_client.list_agents())
+        all_agents = list(await agent_client.list_agents())
         logger.info(f"Connected. Found {len(all_agents)} existing agents")
         
         # Get matching agents
-        matching_agents = get_matching_agents(
+        matching_agents = await get_matching_agents(
             agent_client=agent_client,
             prefix=args.prefix,
             suffix=args.suffix
@@ -313,7 +314,7 @@ def handle_delete_all_agents_arg(args: argparse.Namespace, agent_client: AgentFr
                 logger.info("Deletion cancelled by user.")
                 return
         
-        success, deleted_count = delete_agents(
+        success, deleted_count = await delete_agents(
             agent_client=agent_client,
             agent_list=matching_agents
         )
@@ -324,12 +325,12 @@ def handle_delete_all_agents_arg(args: argparse.Namespace, agent_client: AgentFr
         logger.error(f"Error during bulk deletion: {e}")
         sys.exit(1)
 
-def main() -> None:
+async def main() -> None:
     args = process_args()
 
     setup_logging(log_level_name=args.log_level)
 
-    agent_client: AgentFrameworkAgentsClient | None = None
+    agent_client: AsyncAgentClient | None = None
     operations_requested = any(
         [
             args.download_all_agents,
@@ -350,28 +351,33 @@ def main() -> None:
         agent_client = get_agent_client(args)
 
         if args.download_agent and agent_client:
-            handle_download_agent_arg(args=args, agent_client=agent_client)
+            await handle_download_agent_arg(args=args, agent_client=agent_client)
 
         if args.download_all_agents and agent_client:
-            handle_download_all_agents_arg(args=args, agent_client=agent_client)
+            await handle_download_all_agents_arg(args=args, agent_client=agent_client)
 
         if args.upload_agent and agent_client:
-            handle_upload_agent_arg(args=args, agent_client=agent_client)
+            await handle_upload_agent_arg(args=args, agent_client=agent_client)
 
         if args.upload_all_agents and agent_client:
-            handle_upload_all_agents_arg(args=args, agent_client=agent_client)
+            await handle_upload_all_agents_arg(args=args, agent_client=agent_client)
 
         if args.get_agent_id and agent_client:
-            handle_get_agent_id_arg(args=args, agent_client=agent_client)
+            await handle_get_agent_id_arg(args=args, agent_client=agent_client)
 
         if args.delete_agent and agent_client:
-            handle_delete_agent_arg(args=args, agent_client=agent_client)
+            await handle_delete_agent_arg(args=args, agent_client=agent_client)
 
         if args.delete_all_agents and agent_client:
-            handle_delete_all_agents_arg(args=args, agent_client=agent_client)
+            await handle_delete_all_agents_arg(args=args, agent_client=agent_client)
     finally:
         if agent_client is not None:
-            agent_client.close()
+            await agent_client.close()
+
+def cli_entry_point() -> None:
+    """Entry point for the console script."""
+    asyncio.run(main())
+
 
 if __name__ == "__main__":
-    main()
+    cli_entry_point()

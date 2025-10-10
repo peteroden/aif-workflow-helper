@@ -42,7 +42,7 @@ def trim_agent_name(agent_name: str, prefix: str = "", suffix: str = "") -> str:
         agent_name = agent_name[:-len(suffix)]
     return agent_name
 
-def get_agent_name(agent_id: str, agent_client: SupportsAgents) -> Optional[str]:
+async def get_agent_name(agent_id: str, agent_client: SupportsAgents) -> Optional[str]:
     """Retrieve an agent's name by its ID.
 
     Args:
@@ -54,14 +54,14 @@ def get_agent_name(agent_id: str, agent_client: SupportsAgents) -> Optional[str]
     """
     name: str | None = None
     try:
-        agent = agent_client.get_agent(agent_id)
+        agent = await agent_client.get_agent(agent_id)
         if agent:
             name = agent.name
     except Exception as e:
         logger.warning(f"Error getting agent name for ID {agent_id}: {e}")
     return name
 
-def get_agent_by_name(agent_name: str, agent_client: SupportsAgents) -> Optional[AgentLike]:
+async def get_agent_by_name(agent_name: str, agent_client: SupportsAgents) -> Optional[AgentLike]:
     """Fetch an agent object by its name.
 
     Args:
@@ -73,7 +73,7 @@ def get_agent_by_name(agent_name: str, agent_client: SupportsAgents) -> Optional
     """
     found: AgentLike | None = None
     try:
-        agent_list = agent_client.list_agents()
+        agent_list = await agent_client.list_agents()
         for agent in agent_list:
             if agent.name == agent_name:
                 found = agent
@@ -82,7 +82,7 @@ def get_agent_by_name(agent_name: str, agent_client: SupportsAgents) -> Optional
         logger.warning(f"Error getting agent by name '{agent_name}': {e}")
     return found
 
-def generalize_agent_dict(data: dict, agent_client: SupportsAgents, prefix: str = "", suffix: str = "") -> dict:
+async def generalize_agent_dict(data: dict, agent_client: SupportsAgents, prefix: str = "", suffix: str = "") -> dict:
     """Normalize an agent-derived structure for export.
 
     Removes transient keys (``id``, ``created_at``), converts connected agent
@@ -104,19 +104,19 @@ def generalize_agent_dict(data: dict, agent_client: SupportsAgents, prefix: str 
         if data.get('type') == 'connected_agent':
             connected_agent_data = data.get('connected_agent', {})
             agent_id = connected_agent_data.get('id')
-            agent_name = get_agent_name(agent_id, agent_client) if agent_id is not None else None
+            agent_name = await get_agent_name(agent_id, agent_client) if agent_id is not None else None
 
             processed_connected: dict = {}
             for k, v in data.items():
                 if k in ['id', 'created_at']:
                     continue
                 if k == 'connected_agent':
-                    nested = generalize_agent_dict(v, agent_client, prefix, suffix)
+                    nested = await generalize_agent_dict(v, agent_client, prefix, suffix)
                     if isinstance(nested, dict):
                         nested['name_from_id'] = trim_agent_name(agent_name, prefix, suffix) if agent_name else "Unknown Agent"
                     processed_connected[k] = nested
                 else:
-                    processed_connected[k] = generalize_agent_dict(v, agent_client, prefix, suffix)
+                    processed_connected[k] = await generalize_agent_dict(v, agent_client, prefix, suffix)
             result = processed_connected
         else:
             processed: dict = {}
@@ -126,16 +126,16 @@ def generalize_agent_dict(data: dict, agent_client: SupportsAgents, prefix: str 
                 if k == 'name':
                     processed[k] = trim_agent_name(v, prefix, suffix)
                 else:
-                    processed[k] = generalize_agent_dict(v, agent_client, prefix, suffix)
+                    processed[k] = await generalize_agent_dict(v, agent_client, prefix, suffix)
             result = processed
     elif isinstance(data, list):
-        result = [generalize_agent_dict(item, agent_client, prefix, suffix) for item in data]
+        result = [await generalize_agent_dict(item, agent_client, prefix, suffix) for item in data]
     else:
         result = data
 
     return result
 
-def download_agents(
+async def download_agents(
     agent_client: SupportsAgents,
     file_path: Optional[str] = None,
     prefix: str = "",
@@ -158,7 +158,7 @@ def download_agents(
         True if all selected agents were written successfully; False otherwise.
     """
     success = True
-    agent_list = agent_client.list_agents()
+    agent_list = await agent_client.list_agents()
     base_dir = file_path or "."
 
     if base_dir and base_dir != ".":
@@ -182,7 +182,7 @@ def download_agents(
                 logger.debug(f"Agent dict keys: {list(agent_dict.keys()) if agent_dict else 'None'}")
                 
                 logger.debug(f"Generalizing agent dict for '{agent.name}'...")
-                clean_dict = generalize_agent_dict(agent_dict, agent_client, prefix, suffix)
+                clean_dict = await generalize_agent_dict(agent_dict, agent_client, prefix, suffix)
                 
                 agent_name = agent.name[len(prefix):] if prefix else agent.name
                 agent_name = agent_name[:-len(suffix)] if suffix else agent_name
@@ -205,7 +205,7 @@ def download_agents(
 
     return success
 
-def download_agent(
+async def download_agent(
     agent_name: str,
     agent_client: SupportsAgents,
     file_path: Optional[str] = None,
@@ -229,7 +229,7 @@ def download_agent(
     success = True
     full_agent_name = f"{prefix}{agent_name}{suffix}"
     validate_agent_name(full_agent_name)
-    agent = get_agent_by_name(full_agent_name, agent_client)
+    agent = await get_agent_by_name(full_agent_name, agent_client)
 
     base_dir = file_path or "."
     if base_dir and base_dir != ".":
@@ -241,7 +241,7 @@ def download_agent(
 
     if success and agent:
         agent_dict = agent.as_dict()
-        clean_dict = generalize_agent_dict(agent_dict, agent_client, prefix, suffix)
+        clean_dict = await generalize_agent_dict(agent_dict, agent_client, prefix, suffix)
         file_extension = get_file_extension(format)
         full_path = Path(f"{base_dir}/{agent_name}{file_extension}")
         

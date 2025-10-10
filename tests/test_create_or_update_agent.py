@@ -22,21 +22,24 @@ class DummyClient:
         self.update_agent = MagicMock(return_value=make_agent("updated", "upid"))
         self.list_agents = MagicMock(return_value=self._agents)
 
-def test_create_new_agent(agents_client_mock):
+@pytest.mark.asyncio
+async def test_create_new_agent(agents_client_mock):
     agent_payload = {**test_consts.TEST_AGENT_DATA, "model": "gpt-4", "instructions": "hi"}
-    result = create_or_update_agent(agent_payload, agents_client_mock)
+    result = await create_or_update_agent(agent_payload, agents_client_mock)
     assert result.name == test_consts.TEST_AGENT_DATA["name"]
 
-def test_update_existing_agent(agents_client_mock):
+@pytest.mark.asyncio
+async def test_update_existing_agent(agents_client_mock):
     base = {**test_consts.TEST_AGENT_DATA, "model": "gpt-4", "instructions": "orig"}
-    create_or_update_agent(base, agents_client_mock)
+    await create_or_update_agent(base, agents_client_mock)
     agent_data_update = base.copy()
     agent_data_update["instructions"] = "updated"
-    result = create_or_update_agent(agent_data_update, agents_client_mock)
+    result = await create_or_update_agent(agent_data_update, agents_client_mock)
     assert result.instructions == "updated"
 
 
-def test_create_agent_drops_empty_tool_resources_and_object(agents_client_mock):
+@pytest.mark.asyncio
+async def test_create_agent_drops_empty_tool_resources_and_object(agents_client_mock):
     agent_data = {
         "name": "agent",
         "tools": [],
@@ -46,7 +49,7 @@ def test_create_agent_drops_empty_tool_resources_and_object(agents_client_mock):
         "instructions": "x",
     }
 
-    result = create_or_update_agent(agent_data, agents_client_mock)
+    result = await create_or_update_agent(agent_data, agents_client_mock)
 
     assert result.name == "agent"
     assert not hasattr(result, "tool_resources")
@@ -54,10 +57,11 @@ def test_create_agent_drops_empty_tool_resources_and_object(agents_client_mock):
     assert "object" not in result._extra
 
 
-def test_create_agent_applies_prefix_and_suffix(agents_client_mock):
+@pytest.mark.asyncio
+async def test_create_agent_applies_prefix_and_suffix(agents_client_mock):
     agent_data = {"name": "core", "tools": [], "model": "gpt-4", "instructions": "x"}
 
-    result = create_or_update_agent(
+    result = await create_or_update_agent(
         agent_data,
         agents_client_mock,
         prefix="pre-",
@@ -67,9 +71,10 @@ def test_create_agent_applies_prefix_and_suffix(agents_client_mock):
     assert result.name == "pre-core-suf"
 
 
-def test_create_agent_converts_connected_agent_names_with_prefix(agents_client_mock):
+@pytest.mark.asyncio
+async def test_create_agent_converts_connected_agent_names_with_prefix(agents_client_mock):
     child_data = {"name": "child", "tools": [], "model": "gpt-4", "instructions": "c"}
-    child = create_or_update_agent(child_data, agents_client_mock, prefix="pre-")
+    child = await create_or_update_agent(child_data, agents_client_mock, prefix="pre-")
 
     parent_data = {
         "name": "parent",
@@ -83,28 +88,31 @@ def test_create_agent_converts_connected_agent_names_with_prefix(agents_client_m
         "instructions": "p",
     }
 
-    parent = create_or_update_agent(parent_data, agents_client_mock, prefix="pre-")
+    parent = await create_or_update_agent(parent_data, agents_client_mock, prefix="pre-")
 
     tool_payload = parent.tools[0]["connected_agent"]
     assert "name_from_id" not in tool_payload
     assert tool_payload["id"] == child.id
 
 
-def test_create_or_update_agent_requires_name(agents_client_mock, caplog):
-    result = create_or_update_agent({"tools": []}, agents_client_mock)
+@pytest.mark.asyncio
+async def test_create_or_update_agent_requires_name(agents_client_mock, caplog):
+    result = await create_or_update_agent({"tools": []}, agents_client_mock)
 
     assert result is None
     assert any("missing 'name'" in message for message in caplog.messages)
 
 
-def test_create_or_update_agents_from_files_missing_directory(agents_client_mock):
+@pytest.mark.asyncio
+async def test_create_or_update_agents_from_files_missing_directory(agents_client_mock):
     with pytest.raises(ValueError):
-        create_or_update_agents_from_files("/tmp/not-here", agents_client_mock)
+        await create_or_update_agents_from_files("/tmp/not-here", agents_client_mock)
 
 
-def test_create_or_update_agents_detects_circular_dependencies(agents_client_mock):
+@pytest.mark.asyncio
+async def test_create_or_update_agents_detects_circular_dependencies(agents_client_mock):
     with pytest.raises(ValueError):
-        create_or_update_agents(
+        await create_or_update_agents(
             test_consts.TEST_AGENT_DATA_CIRCULAR_DEPENDENCY,
             agents_client_mock,
         )

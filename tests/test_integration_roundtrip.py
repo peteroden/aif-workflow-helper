@@ -10,8 +10,9 @@ import tempfile
 from pathlib import Path
 from typing import Dict, Any
 import pytest
+import pytest_asyncio
 
-from aif_workflow_helper.core.agent_framework_client import AgentFrameworkAgentsClient
+from aif_workflow_helper.core.async_agent_client import AsyncAgentClient
 from aif_workflow_helper.core.upload import create_or_update_agent, read_agent_file
 from aif_workflow_helper.core.download import download_agent
 from aif_workflow_helper.utils.logging import logger
@@ -96,8 +97,8 @@ def requires_azure_ai_foundry():
     )
 
 
-@pytest.fixture
-def azure_agent_client():
+@pytest_asyncio.fixture
+async def azure_agent_client():
     """Create a real Azure AI Foundry agent client for integration tests."""
     project_endpoint = os.getenv("AZURE_AI_PROJECT_ENDPOINT")
     tenant_id = os.getenv("AZURE_TENANT_ID")
@@ -105,7 +106,7 @@ def azure_agent_client():
     if not project_endpoint or not tenant_id:
         pytest.skip("Azure AI Foundry credentials not configured")
     
-    client = AgentFrameworkAgentsClient(
+    client = AsyncAgentClient(
         project_endpoint=project_endpoint,
         tenant_id=tenant_id
     )
@@ -114,15 +115,15 @@ def azure_agent_client():
     
     # Cleanup: Try to remove any test agents created during tests
     try:
-        agents = client.list_agents()
+        agents = await client.list_agents()
         for agent in agents:
             if agent.name.startswith("integration-test-"):
                 logger.info(f"Cleaning up test agent: {agent.name}")
-                client.delete_agent(agent.id)
+                await client.delete_agent(agent.id)
     except Exception as e:
         logger.warning(f"Error during test cleanup: {e}")
     finally:
-        client.close()
+        await client.close()
 
 
 @pytest.fixture
@@ -144,7 +145,8 @@ class TestIntegrationRoundtrip:
     """Integration tests for complete upload/download roundtrip with AI Foundry."""
     
     @requires_azure_ai_foundry()
-    def test_basic_agent_roundtrip_json(self, azure_agent_client, test_agent_base_name):
+    @pytest.mark.asyncio
+    async def test_basic_agent_roundtrip_json(self, azure_agent_client, test_agent_base_name):
         """Test basic agent roundtrip with JSON format."""
         original_agent = {
             "name": test_agent_base_name,
@@ -159,7 +161,7 @@ class TestIntegrationRoundtrip:
         
         with tempfile.TemporaryDirectory() as tmpdir:
             # Upload to AI Foundry
-            uploaded_agent = create_or_update_agent(
+            uploaded_agent = await create_or_update_agent(
                 agent_data=original_agent,
                 agent_client=azure_agent_client
             )
@@ -170,7 +172,7 @@ class TestIntegrationRoundtrip:
             
             # Download from AI Foundry
             download_path = Path(tmpdir)
-            success = download_agent(
+            success = await download_agent(
                 agent_name=test_agent_base_name,
                 agent_client=azure_agent_client,
                 file_path=str(download_path),
@@ -194,7 +196,8 @@ class TestIntegrationRoundtrip:
             assert norm_downloaded == norm_original
     
     @requires_azure_ai_foundry()
-    def test_agent_with_tools_roundtrip_yaml(self, azure_agent_client, test_agent_base_name):
+    @pytest.mark.asyncio
+    async def test_agent_with_tools_roundtrip_yaml(self, azure_agent_client, test_agent_base_name):
         """Test agent with function tools roundtrip using YAML format."""
         original_agent = {
             "name": test_agent_base_name,
@@ -231,7 +234,7 @@ class TestIntegrationRoundtrip:
         
         with tempfile.TemporaryDirectory() as tmpdir:
             # Upload to AI Foundry
-            uploaded_agent = create_or_update_agent(
+            uploaded_agent = await create_or_update_agent(
                 agent_data=original_agent,
                 agent_client=azure_agent_client
             )
@@ -241,7 +244,7 @@ class TestIntegrationRoundtrip:
             
             # Download from AI Foundry
             download_path = Path(tmpdir)
-            success = download_agent(
+            success = await download_agent(
                 agent_name=test_agent_base_name,
                 agent_client=azure_agent_client,
                 file_path=str(download_path),
@@ -274,7 +277,8 @@ class TestIntegrationRoundtrip:
             assert downloaded_tool["function"]["parameters"] == original_tool["function"]["parameters"]
     
     @requires_azure_ai_foundry()
-    def test_agent_with_tool_resources_roundtrip_md(self, azure_agent_client, test_agent_base_name):
+    @pytest.mark.asyncio
+    async def test_agent_with_tool_resources_roundtrip_md(self, azure_agent_client, test_agent_base_name):
         """Test agent with tool resources roundtrip using Markdown format."""
         original_agent = {
             "name": test_agent_base_name,
@@ -294,7 +298,7 @@ class TestIntegrationRoundtrip:
         
         with tempfile.TemporaryDirectory() as tmpdir:
             # Upload to AI Foundry
-            uploaded_agent = create_or_update_agent(
+            uploaded_agent = await create_or_update_agent(
                 agent_data=original_agent,
                 agent_client=azure_agent_client
             )
@@ -304,7 +308,7 @@ class TestIntegrationRoundtrip:
             
             # Download from AI Foundry
             download_path = Path(tmpdir)
-            success = download_agent(
+            success = await download_agent(
                 agent_name=test_agent_base_name,
                 agent_client=azure_agent_client,
                 file_path=str(download_path),
@@ -334,7 +338,8 @@ class TestIntegrationRoundtrip:
                 assert "file_search" in downloaded_agent["tool_resources"]
     
     @requires_azure_ai_foundry()
-    def test_multiple_roundtrips_consistency(self, azure_agent_client, test_agent_base_name):
+    @pytest.mark.asyncio
+    async def test_multiple_roundtrips_consistency(self, azure_agent_client, test_agent_base_name):
         """Test that multiple roundtrips produce consistent results."""
         original_agent = {
             "name": test_agent_base_name,
@@ -374,7 +379,7 @@ class TestIntegrationRoundtrip:
                 logger.info(f"Starting roundtrip iteration {iteration + 1}")
                 
                 # Upload current agent
-                uploaded_agent = create_or_update_agent(
+                uploaded_agent = await create_or_update_agent(
                     agent_data=current_agent,
                     agent_client=azure_agent_client
                 )
@@ -382,7 +387,7 @@ class TestIntegrationRoundtrip:
                 assert uploaded_agent is not None, f"Upload failed in iteration {iteration + 1}"
                 
                 # Download the agent
-                success = download_agent(
+                success = await download_agent(
                     agent_name=test_agent_base_name,
                     agent_client=azure_agent_client,
                     file_path=str(download_path),
@@ -413,7 +418,8 @@ class TestIntegrationRoundtrip:
                 current_agent = downloaded_agent
     
     @requires_azure_ai_foundry()
-    def test_unicode_characters_roundtrip(self, azure_agent_client, test_agent_base_name):
+    @pytest.mark.asyncio
+    async def test_unicode_characters_roundtrip(self, azure_agent_client, test_agent_base_name):
         """Test that unicode characters and emojis are preserved through roundtrip."""
         original_agent = {
             "name": test_agent_base_name,
@@ -432,7 +438,7 @@ class TestIntegrationRoundtrip:
         
         with tempfile.TemporaryDirectory() as tmpdir:
             # Upload to AI Foundry
-            uploaded_agent = create_or_update_agent(
+            uploaded_agent = await create_or_update_agent(
                 agent_data=original_agent,
                 agent_client=azure_agent_client
             )
@@ -442,7 +448,7 @@ class TestIntegrationRoundtrip:
             
             # Download from AI Foundry
             download_path = Path(tmpdir)
-            success = download_agent(
+            success = await download_agent(
                 agent_name=test_agent_base_name,
                 agent_client=azure_agent_client,
                 file_path=str(download_path),
@@ -470,7 +476,8 @@ class TestIntegrationRoundtrip:
             assert downloaded_agent["metadata"]["emoji"] == original_agent["metadata"]["emoji"]
     
     @requires_azure_ai_foundry()
-    def test_sample_agents_roundtrip(self, azure_agent_client, test_agent_base_name, sample_agents_dir):
+    @pytest.mark.asyncio
+    async def test_sample_agents_roundtrip(self, azure_agent_client, test_agent_base_name, sample_agents_dir):
         """Test roundtrip using real sample agent files from the repository."""
         from aif_workflow_helper.core.upload import read_agent_files, create_or_update_agents
         
@@ -506,7 +513,7 @@ class TestIntegrationRoundtrip:
         
         # Upload all agents (with dependency resolution)
         try:
-            create_or_update_agents(
+            await create_or_update_agents(
                 agents_data=test_agents,
                 agent_client=azure_agent_client
             )
@@ -521,7 +528,7 @@ class TestIntegrationRoundtrip:
             download_path = Path(tmpdir)
             
             for agent_name in test_agents.keys():
-                success = download_agent(
+                success = await download_agent(
                     agent_name=agent_name,
                     agent_client=azure_agent_client, 
                     file_path=str(download_path),
@@ -562,7 +569,8 @@ class TestIntegrationRoundtrip:
                                 assert down_connected["name_from_id"] == orig_connected["name_from_id"]
     
     @requires_azure_ai_foundry()
-    def test_connected_agent_dependency_roundtrip(self, azure_agent_client, test_agent_base_name):
+    @pytest.mark.asyncio
+    async def test_connected_agent_dependency_roundtrip(self, azure_agent_client, test_agent_base_name):
         """Test that connected agent dependencies are properly handled in roundtrip."""
         # Create a child agent first
         child_agent = {
@@ -597,7 +605,7 @@ class TestIntegrationRoundtrip:
         
         with tempfile.TemporaryDirectory() as tmpdir:
             # Upload child agent first
-            uploaded_child = create_or_update_agent(
+            uploaded_child = await create_or_update_agent(
                 agent_data=child_agent,
                 agent_client=azure_agent_client
             )
@@ -605,9 +613,9 @@ class TestIntegrationRoundtrip:
             logger.info(f"Uploaded child agent with ID: {uploaded_child.id}")
             
             # Refresh existing agents so parent can resolve dependency
-            existing_agents = list(azure_agent_client.list_agents())
+            existing_agents = list(await azure_agent_client.list_agents())
             # Upload parent agent (should resolve child dependency)
-            uploaded_parent = create_or_update_agent(
+            uploaded_parent = await create_or_update_agent(
                 agent_data=parent_agent,
                 agent_client=azure_agent_client,
                 existing_agents=existing_agents
@@ -617,7 +625,7 @@ class TestIntegrationRoundtrip:
             
             # Download parent agent
             download_path = Path(tmpdir)
-            success = download_agent(
+            success = await download_agent(
                 agent_name=f"{test_agent_base_name}-parent",
                 agent_client=azure_agent_client,
                 file_path=str(download_path),
@@ -646,7 +654,8 @@ class TestIntegrationRoundtrip:
             assert "id" not in connected_data  # ID should be stripped during download
     
     @requires_azure_ai_foundry()
-    def test_prefix_suffix_handling_roundtrip(self, azure_agent_client, test_agent_base_name):
+    @pytest.mark.asyncio
+    async def test_prefix_suffix_handling_roundtrip(self, azure_agent_client, test_agent_base_name):
         """Test that prefix and suffix are handled correctly in roundtrip."""
         prefix = "test-"
         suffix = "-v1"
@@ -665,7 +674,7 @@ class TestIntegrationRoundtrip:
         
         with tempfile.TemporaryDirectory() as tmpdir:
             # Upload with prefix and suffix
-            uploaded_agent = create_or_update_agent(
+            uploaded_agent = await create_or_update_agent(
                 agent_data=original_agent,
                 agent_client=azure_agent_client,
                 prefix=prefix,
@@ -680,7 +689,7 @@ class TestIntegrationRoundtrip:
             
             # Download with prefix and suffix
             download_path = Path(tmpdir)
-            success = download_agent(
+            success = await download_agent(
                 agent_name=base_name,  # Use base name for download
                 agent_client=azure_agent_client,
                 file_path=str(download_path),
@@ -708,7 +717,8 @@ class TestIntegrationRoundtrip:
 
 
     @requires_azure_ai_foundry()
-    def test_complete_sample_workflow_roundtrip(self, azure_agent_client, test_agent_base_name, sample_agents_dir):
+    @pytest.mark.asyncio
+    async def test_complete_sample_workflow_roundtrip(self, azure_agent_client, test_agent_base_name, sample_agents_dir):
         """Test the complete workflow with all sample agents including dependency resolution."""
         from aif_workflow_helper.core.upload import create_or_update_agents_from_files
         
@@ -753,7 +763,7 @@ class TestIntegrationRoundtrip:
             
             # Upload all agents using the complete workflow
             try:
-                create_or_update_agents_from_files(
+                await create_or_update_agents_from_files(
                     path=str(work_path),
                     agent_client=azure_agent_client,
                     format="md"
@@ -768,7 +778,7 @@ class TestIntegrationRoundtrip:
             
             # Get list of uploaded agents
             uploaded_agents = []
-            for agent in azure_agent_client.list_agents():
+            for agent in await azure_agent_client.list_agents():
                 if agent.name.startswith(test_prefix):
                     uploaded_agents.append(agent)
             
@@ -778,7 +788,7 @@ class TestIntegrationRoundtrip:
             for agent in uploaded_agents:
                 agent_base_name = agent.name[len(test_prefix):]  # Remove prefix
                 
-                success = download_agent(
+                success = await download_agent(
                     agent_name=agent_base_name,
                     agent_client=azure_agent_client,
                     file_path=str(download_path),
@@ -820,7 +830,8 @@ class TestIntegrationRoundtripErrors:
     """Test error conditions in integration roundtrip scenarios."""
     
     @requires_azure_ai_foundry()
-    def test_upload_invalid_model_fails(self, azure_agent_client, test_agent_base_name):
+    @pytest.mark.asyncio
+    async def test_upload_invalid_model_fails(self, azure_agent_client, test_agent_base_name):
         """Document current service behavior: unknown model is accepted (no validation here)."""
         test_agent = {
             "name": test_agent_base_name,
@@ -831,7 +842,7 @@ class TestIntegrationRoundtripErrors:
 
         print_agent_definition(test_agent, "UNKNOWN MODEL AGENT")
 
-        uploaded_agent = create_or_update_agent(
+        uploaded_agent = await create_or_update_agent(
             agent_data=test_agent,
             agent_client=azure_agent_client
         )
@@ -841,12 +852,13 @@ class TestIntegrationRoundtripErrors:
         assert uploaded_agent.model == test_agent["model"], "Model string not preserved"
     
     @requires_azure_ai_foundry()
-    def test_download_nonexistent_agent_fails(self, azure_agent_client):
+    @pytest.mark.asyncio
+    async def test_download_nonexistent_agent_fails(self, azure_agent_client):
         """Test that downloading non-existent agent fails gracefully."""
         nonexistent_name = "definitely-does-not-exist-12345"
         
         with tempfile.TemporaryDirectory() as tmpdir:
-            success = download_agent(
+            success = await download_agent(
                 agent_name=nonexistent_name,
                 agent_client=azure_agent_client,
                 file_path=tmpdir,

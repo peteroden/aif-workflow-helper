@@ -43,30 +43,33 @@ def mock_agent_with_prefix_suffix():
 class TestDeleteAgentByName:
     """Tests for the delete_agent_by_name function."""
     
-    def test_delete_agent_by_name_success(self, mock_agent_client, mock_agent):
+    @pytest.mark.asyncio
+    async def test_delete_agent_by_name_success(self, mock_agent_client, mock_agent):
         """Test successful deletion."""
         with patch('aif_workflow_helper.core.delete.get_agent_by_name', return_value=mock_agent):
-            result = delete_agent_by_name(
+            result = await delete_agent_by_name(
                 agent_name="test-agent",
                 agent_client=mock_agent_client
             )
             assert result is True
             mock_agent_client.delete_agent.assert_called_once_with(mock_agent.id)
     
-    def test_delete_agent_by_name_not_found(self, mock_agent_client):
+    @pytest.mark.asyncio
+    async def test_delete_agent_by_name_not_found(self, mock_agent_client):
         """Test deletion when agent is not found."""
         with patch('aif_workflow_helper.core.delete.get_agent_by_name', return_value=None):
-            result = delete_agent_by_name(
+            result = await delete_agent_by_name(
                 agent_name="missing-agent",
                 agent_client=mock_agent_client
             )
             assert result is False
             mock_agent_client.delete_agent.assert_not_called()
     
-    def test_delete_agent_by_name_with_prefix(self, mock_agent_client, mock_agent_with_prefix):
+    @pytest.mark.asyncio
+    async def test_delete_agent_by_name_with_prefix(self, mock_agent_client, mock_agent_with_prefix):
         """Test deletion with prefix."""
         with patch('aif_workflow_helper.core.delete.get_agent_by_name', return_value=mock_agent_with_prefix):
-            result = delete_agent_by_name(
+            result = await delete_agent_by_name(
                 agent_name="test-agent",
                 agent_client=mock_agent_client,
                 prefix="dev-"
@@ -74,11 +77,12 @@ class TestDeleteAgentByName:
             assert result is True
             mock_agent_client.delete_agent.assert_called_once_with(mock_agent_with_prefix.id)
     
-    def test_delete_agent_by_name_with_suffix(self, mock_agent_client, mock_agent):
+    @pytest.mark.asyncio
+    async def test_delete_agent_by_name_with_suffix(self, mock_agent_client, mock_agent):
         """Test deletion with suffix."""
         mock_agent.name = "test-agent-v1"
         with patch('aif_workflow_helper.core.delete.get_agent_by_name', return_value=mock_agent):
-            result = delete_agent_by_name(
+            result = await delete_agent_by_name(
                 agent_name="test-agent",
                 agent_client=mock_agent_client,
                 suffix="-v1"
@@ -86,10 +90,11 @@ class TestDeleteAgentByName:
             assert result is True
             mock_agent_client.delete_agent.assert_called_once_with(mock_agent.id)
     
-    def test_delete_agent_by_name_with_prefix_and_suffix(self, mock_agent_client, mock_agent_with_prefix_suffix):
+    @pytest.mark.asyncio
+    async def test_delete_agent_by_name_with_prefix_and_suffix(self, mock_agent_client, mock_agent_with_prefix_suffix):
         """Test deletion with both prefix and suffix."""
         with patch('aif_workflow_helper.core.delete.get_agent_by_name', return_value=mock_agent_with_prefix_suffix):
-            result = delete_agent_by_name(
+            result = await delete_agent_by_name(
                 agent_name="test-agent",
                 agent_client=mock_agent_client,
                 prefix="dev-",
@@ -98,11 +103,12 @@ class TestDeleteAgentByName:
             assert result is True
             mock_agent_client.delete_agent.assert_called_once_with(mock_agent_with_prefix_suffix.id)
     
-    def test_delete_agent_by_name_api_error(self, mock_agent_client, mock_agent):
+    @pytest.mark.asyncio
+    async def test_delete_agent_by_name_api_error(self, mock_agent_client, mock_agent):
         """Test handling of API errors during deletion."""
         with patch('aif_workflow_helper.core.delete.get_agent_by_name', return_value=mock_agent):
             mock_agent_client.delete_agent.side_effect = Exception("API Error")
-            result = delete_agent_by_name(
+            result = await delete_agent_by_name(
                 agent_name="test-agent",
                 agent_client=mock_agent_client
             )
@@ -112,7 +118,8 @@ class TestDeleteAgentByName:
 class TestGetMatchingAgents:
     """Tests for the get_matching_agents function."""
     
-    def test_get_matching_agents_no_filter(self, mock_agent_client):
+    @pytest.mark.asyncio
+    async def test_get_matching_agents_no_filter(self, mock_agent_client):
         """Test getting all agents when no filter is provided."""
         agents = [
             Mock(id="agent-1", name="agent-1"),
@@ -121,11 +128,12 @@ class TestGetMatchingAgents:
         ]
         mock_agent_client.list_agents.return_value = agents
         
-        result = get_matching_agents(agent_client=mock_agent_client)
+        result = await get_matching_agents(agent_client=mock_agent_client)
         
         assert len(result) == 3
     
-    def test_get_matching_agents_with_prefix(self, mock_agent_client):
+    @pytest.mark.asyncio
+    async def test_get_matching_agents_with_prefix(self, mock_agent_client):
         """Test filtering agents by prefix."""
         agent1 = Mock()
         agent1.id = "agent-1"
@@ -139,7 +147,7 @@ class TestGetMatchingAgents:
         agents = [agent1, agent2, agent3]
         mock_agent_client.list_agents.return_value = agents
         
-        result = get_matching_agents(
+        result = await get_matching_agents(
             agent_client=mock_agent_client,
             prefix="dev-"
         )
@@ -147,7 +155,8 @@ class TestGetMatchingAgents:
         assert len(result) == 2
         assert all(a.name.startswith("dev-") for a in result)
     
-    def test_get_matching_agents_with_suffix(self, mock_agent_client):
+    @pytest.mark.asyncio
+    async def test_get_matching_agents_with_suffix(self, mock_agent_client):
         """Test filtering agents by suffix."""
         agent1 = Mock()
         agent1.id = "agent-1"
@@ -161,7 +170,7 @@ class TestGetMatchingAgents:
         agents = [agent1, agent2, agent3]
         mock_agent_client.list_agents.return_value = agents
         
-        result = get_matching_agents(
+        result = await get_matching_agents(
             agent_client=mock_agent_client,
             suffix="-v1"
         )
@@ -169,7 +178,8 @@ class TestGetMatchingAgents:
         assert len(result) == 2
         assert all(a.name.endswith("-v1") for a in result)
     
-    def test_get_matching_agents_with_prefix_and_suffix(self, mock_agent_client):
+    @pytest.mark.asyncio
+    async def test_get_matching_agents_with_prefix_and_suffix(self, mock_agent_client):
         """Test filtering agents by both prefix and suffix."""
         agent1 = Mock()
         agent1.id = "agent-1"
@@ -186,7 +196,7 @@ class TestGetMatchingAgents:
         agents = [agent1, agent2, agent3, agent4]
         mock_agent_client.list_agents.return_value = agents
         
-        result = get_matching_agents(
+        result = await get_matching_agents(
             agent_client=mock_agent_client,
             prefix="dev-",
             suffix="-v1"
@@ -195,7 +205,8 @@ class TestGetMatchingAgents:
         assert len(result) == 2
         assert all(a.name.startswith("dev-") and a.name.endswith("-v1") for a in result)
     
-    def test_get_matching_agents_no_matches(self, mock_agent_client):
+    @pytest.mark.asyncio
+    async def test_get_matching_agents_no_matches(self, mock_agent_client):
         """Test when no agents match the filter."""
         agent1 = Mock()
         agent1.id = "agent-1"
@@ -206,7 +217,7 @@ class TestGetMatchingAgents:
         agents = [agent1, agent2]
         mock_agent_client.list_agents.return_value = agents
         
-        result = get_matching_agents(
+        result = await get_matching_agents(
             agent_client=mock_agent_client,
             prefix="nonexistent-"
         )
@@ -217,7 +228,8 @@ class TestGetMatchingAgents:
 class TestDeleteAgents:
     """Tests for the delete_agents function (bulk deletion)."""
     
-    def test_delete_agents_success(self, mock_agent_client):
+    @pytest.mark.asyncio
+    async def test_delete_agents_success(self, mock_agent_client):
         """Test successful bulk deletion."""
         agents = [
             Mock(id="agent-1", name="test-agent-1"),
@@ -225,7 +237,7 @@ class TestDeleteAgents:
             Mock(id="agent-3", name="test-agent-3")
         ]
         
-        success, count = delete_agents(agent_client=mock_agent_client, agent_list=agents)
+        success, count = await delete_agents(agent_client=mock_agent_client, agent_list=agents)
         
         assert success is True
         assert count == 3
@@ -236,15 +248,17 @@ class TestDeleteAgents:
             call("agent-3")
         ], any_order=True)
     
-    def test_delete_agents_empty_list(self, mock_agent_client):
+    @pytest.mark.asyncio
+    async def test_delete_agents_empty_list(self, mock_agent_client):
         """Test bulk deletion when agent list is empty."""
-        success, count = delete_agents(agent_client=mock_agent_client, agent_list=[])
+        success, count = await delete_agents(agent_client=mock_agent_client, agent_list=[])
         
         assert success is True
         assert count == 0
         mock_agent_client.delete_agent.assert_not_called()
     
-    def test_delete_agents_partial_failure(self, mock_agent_client):
+    @pytest.mark.asyncio
+    async def test_delete_agents_partial_failure(self, mock_agent_client):
         """Test bulk deletion with partial failures."""
         agents = [
             Mock(id="agent-1", name="test-agent-1"),
@@ -259,7 +273,7 @@ class TestDeleteAgents:
         
         mock_agent_client.delete_agent.side_effect = delete_side_effect
         
-        success, count = delete_agents(agent_client=mock_agent_client, agent_list=agents)
+        success, count = await delete_agents(agent_client=mock_agent_client, agent_list=agents)
         
         assert success is False
         assert count == 2  # Two succeeded despite one failure

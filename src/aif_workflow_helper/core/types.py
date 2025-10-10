@@ -24,10 +24,11 @@ class AgentLike(Protocol):  # pragma: no cover - structural container
 
 @runtime_checkable
 class SupportsAgents(Protocol):  # pragma: no cover - structural typing only
-    """Protocol capturing the synchronous agent operations used internally."""
+    """Protocol capturing the asynchronous agent operations used internally."""
 
-    def list_agents(self) -> Iterable[AgentLike]: ...  # noqa: D401,E701
-    def create_agent(self, **kwargs: Any) -> AgentLike: ...  # noqa: D401,E701
-    def update_agent(self, agent_id: str, **kwargs: Any) -> AgentLike: ...  # noqa: D401,E701
-    def get_agent(self, agent_id: str) -> AgentLike | None: ...  # noqa: D401,E701
-    def delete_agent(self, agent_id: str) -> None: ...  # noqa: D401,E701
+    async def list_agents(self) -> Iterable[AgentLike]: ...  # noqa: D401,E701
+    async def create_agent(self, **kwargs: Any) -> AgentLike: ...  # noqa: D401,E701
+    async def update_agent(self, agent_id: str, **kwargs: Any) -> AgentLike: ...  # noqa: D401,E701
+    async def get_agent(self, agent_id: str) -> AgentLike | None: ...  # noqa: D401,E701
+    async def delete_agent(self, agent_id: str) -> None: ...  # noqa: D401,E701
+    async def close(self) -> None: ...  # noqa: D401,E701

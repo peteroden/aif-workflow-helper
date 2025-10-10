@@ -14,11 +14,14 @@ def agents_client_mock():
 @pytest.fixture
 def mock_agent_client():
     """Create a mock AgentsClient for testing."""
+    from unittest.mock import AsyncMock
     client = Mock()
-    client.list_agents = Mock()
-    client.get_agent = Mock()
-    client.create_agent = Mock()
-    client.update_agent = Mock()
+    client.list_agents = AsyncMock()
+    client.get_agent = AsyncMock()
+    client.create_agent = AsyncMock()
+    client.update_agent = AsyncMock()
+    client.delete_agent = AsyncMock()
+    client.close = AsyncMock()
     return client
 
 
@@ -184,21 +187,22 @@ def agents_data_with_dependencies():
 
 @pytest.fixture
 def mock_cli_agent_client():
-    """Create a unified mock AgentFrameworkAgentsClient for CLI handler testing.
+    """Create a unified mock AsyncAgentClient for CLI handler testing.
     
     This fixture provides a pre-configured mock client that covers all the
     common CLI handler scenarios. Tests can override specific behaviors
     by modifying the returned mock or its methods.
     """
+    from unittest.mock import AsyncMock
     client = Mock()
     
-    # Mock common methods used by CLI handlers
-    client.list_agents = Mock(return_value=[])
-    client.get_agent = Mock(return_value=None)
-    client.create_agent = Mock()
-    client.update_agent = Mock()
-    client.delete_agent = Mock()
-    client.close = Mock()
+    # Mock common async methods used by CLI handlers
+    client.list_agents = AsyncMock(return_value=[])
+    client.get_agent = AsyncMock(return_value=None)
+    client.create_agent = AsyncMock()
+    client.update_agent = AsyncMock()
+    client.delete_agent = AsyncMock()
+    client.close = AsyncMock()
     
     # Create sample agents for testing scenarios
     sample_agent = Mock()

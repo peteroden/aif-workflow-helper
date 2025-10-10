@@ -54,7 +54,32 @@ Source = "https://github.com/peteroden/aif-workflow-helper"
 
 # Console script entry points
 [project.scripts]
-aif-workflow-helper = "aif_workflow_helper.cli.main:main"
+aif-workflow-helper = "aif_workflow_helper.cli.main:cli_entry_point"
+
+[dependency-groups]
+dev = [
+    "pytest-asyncio>=1.2.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+    "--disable-warnings",
+    "--color=yes",
+    "--durations=10"
+]
+asyncio_mode = "auto"
+markers = [
+    "unit: Unit tests that don't require external dependencies",
+    "integration: Integration tests that require Azure AI Foundry credentials",
+    "slow: Slow running tests that may take significant time"
+]
 
 [tool.mypy]
 python_version = "3.12"

@@ -187,7 +187,7 @@ def _prepare_agent_data_for_azure(agent_data: dict, existing_agents: list, prefi
     return cleaned_data
 
 
-def create_or_update_agent(
+async def create_or_update_agent(
     agent_data: dict,
     agent_client: SupportsAgents,
     existing_agents: Optional[list[AgentLike]] = None,
@@ -233,7 +233,7 @@ def create_or_update_agent(
         existing_agent = None
         if existing_agents is None:
             # Fetch existing agents if not provided
-            existing_agents = list(agent_client.list_agents())
+            existing_agents = list(await agent_client.list_agents())
         
         for existing in existing_agents:
             if existing.name == full_name:
@@ -243,11 +243,11 @@ def create_or_update_agent(
         if existing_agent:
             logger.info(f"Updating existing agent: {full_name}")
             cleaned_agent_data = _prepare_agent_data_for_azure(agent_data, existing_agents, prefix, suffix)
-            agent = agent_client.update_agent(existing_agent.id, **cleaned_agent_data)
+            agent = await agent_client.update_agent(existing_agent.id, **cleaned_agent_data)
         else:
             logger.info(f"Creating new agent: {full_name}")
             cleaned_agent_data = _prepare_agent_data_for_azure(agent_data, existing_agents, prefix, suffix)
-            agent = agent_client.create_agent(**cleaned_agent_data)
+            agent = await agent_client.create_agent(**cleaned_agent_data)
         
         logger.debug(f"Agent operation successful for {full_name}")
 
@@ -256,7 +256,7 @@ def create_or_update_agent(
     
     return agent
 
-def create_or_update_agents(agents_data: dict, agent_client: SupportsAgents, prefix: str="", suffix: str="") -> None:
+async def create_or_update_agents(agents_data: dict, agent_client: SupportsAgents, prefix: str="", suffix: str="") -> None:
     """Create or update multiple agents with dependency-aware ordering.
 
     Args:
@@ -275,14 +275,14 @@ def create_or_update_agents(agents_data: dict, agent_client: SupportsAgents, pre
     sorted_agent_names = dependency_sort(agents_data)
     
     # Get existing agents once for efficiency
-    existing_agents: list[AgentLike] = list(agent_client.list_agents())
+    existing_agents: list[AgentLike] = list(await agent_client.list_agents())
     created_agents: list[AgentLike] = []
 
     for i, agent_name in enumerate(sorted_agent_names, 1):
         logger.info(f"Processing {i}/{len(sorted_agent_names)}: {agent_name}")
         agent_data = agents_data[agent_name]
         
-        agent = create_or_update_agent(
+        agent = await create_or_update_agent(
             agent_data=agent_data,
             agent_client=agent_client,
             existing_agents=existing_agents,
@@ -299,7 +299,7 @@ def create_or_update_agents(agents_data: dict, agent_client: SupportsAgents, pre
 
     logger.info(f"Completed! Processed {len(created_agents)} agents successfully.")
 
-def create_or_update_agents_from_files(path: str, agent_client: SupportsAgents, prefix: str="", suffix: str="", format: str="json") -> None:
+async def create_or_update_agents_from_files(path: str, agent_client: SupportsAgents, prefix: str="", suffix: str="", format: str="json") -> None:
     """Load agent files from a directory and create/update them.
 
     Args:
@@ -325,14 +325,14 @@ def create_or_update_agents_from_files(path: str, agent_client: SupportsAgents, 
 
         if agents_data:
             logger.info("Creating/updating agents...")
-            create_or_update_agents(agents_data, agent_client, prefix, suffix)
+            await create_or_update_agents(agents_data, agent_client, prefix, suffix)
         else:
             logger.info("No agent files found to process")
     except Exception as e:
         logger.error(f"Error uploading agent files: {e}")
         raise ValueError(f"Error uploading agent files: {e}")
 
-def create_or_update_agent_from_file(agent_name: str, path: str, agent_client: SupportsAgents, prefix: str="", suffix: str="", format: str="json") -> None:
+async def create_or_update_agent_from_file(agent_name: str, path: str, agent_client: SupportsAgents, prefix: str="", suffix: str="", format: str="json") -> None:
     """Create or update a single agent from a file.
 
     Args:
@@ -364,7 +364,7 @@ def create_or_update_agent_from_file(agent_name: str, path: str, agent_client: S
 
     agent_dict = read_agent_file(str(file_path))
     if agent_dict:
-        create_or_update_agent(agent_data=agent_dict, agent_client=agent_client, prefix=prefix, suffix=suffix)
+        await create_or_update_agent(agent_data=agent_dict, agent_client=agent_client, prefix=prefix, suffix=suffix)
     else:
         logger.error("Failed to read agent file for '%s' at %s", agent_name, file_path)
         raise ValueError(f"Failed to read agent file for '{agent_name}'")

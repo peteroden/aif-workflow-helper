@@ -65,14 +65,14 @@ class AgentsClientMock:
             raise ValueError(f"Agent with name '{name}' already exists")
 
     # ---- public mock API ----
-    def list_agents(self) -> Iterable[MockAgent]:
+    async def list_agents(self) -> Iterable[MockAgent]:
         # Return a list copy to avoid mutation side-effects
         return list(self._agents_by_id.values())
 
-    def get_agent(self, agent_id: str) -> Optional[MockAgent]:
+    async def get_agent(self, agent_id: str) -> Optional[MockAgent]:
         return self._agents_by_id.get(agent_id)
 
-    def create_agent(self, **kwargs) -> MockAgent:
+    async def create_agent(self, **kwargs) -> MockAgent:
         name = kwargs.get("name")
         if not name:
             raise ValueError("create_agent requires 'name'")
@@ -95,7 +95,7 @@ class AgentsClientMock:
         agent = MockAgent(id=agent_id, name=name, description=description, instructions=instructions, model=model, temperature=temperature, top_p=top_p, metadata=metadata, tools=[t.copy() for t in tools], _extra=extra)
         return self._register(agent)
 
-    def update_agent(self, agent_id: str, body=None, **kwargs) -> MockAgent:
+    async def update_agent(self, agent_id: str, body=None, **kwargs) -> MockAgent:
         """
         Update existing agent.
         """
@@ -134,6 +134,17 @@ class AgentsClientMock:
                 target._extra[k] = v
 
         return target
+
+    async def delete_agent(self, agent_id: str) -> None:
+        """Delete an agent by ID."""
+        if agent_id in self._agents_by_id:
+            agent = self._agents_by_id[agent_id]
+            del self._name_index[agent.name]
+            del self._agents_by_id[agent_id]
+
+    async def close(self) -> None:
+        """Close the client (no-op for mock)."""
+        pass
 
     # Optional convenience for tests
     def reset(self):

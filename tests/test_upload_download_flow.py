@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import json
+import pytest
 from aif_workflow_helper.core.download import download_agent
 from aif_workflow_helper.core.upload import create_or_update_agents_from_files
 
 
 
 
-def test_create_or_update_agents_from_files_resolves_dependencies(tmp_path, agents_client_mock):
+@pytest.mark.asyncio
+async def test_create_or_update_agents_from_files_resolves_dependencies(tmp_path, agents_client_mock):
     """Ensure upload resolves connected_agent references using newly created IDs."""
 
     child_path = tmp_path / "child.json"
@@ -31,7 +33,7 @@ def test_create_or_update_agents_from_files_resolves_dependencies(tmp_path, agen
     child_path.write_text(json.dumps(child_payload), encoding="utf-8")
     parent_path.write_text(json.dumps(parent_payload), encoding="utf-8")
 
-    create_or_update_agents_from_files(
+    await create_or_update_agents_from_files(
         path=str(tmp_path),
         agent_client=agents_client_mock,
         prefix="",
@@ -39,7 +41,7 @@ def test_create_or_update_agents_from_files_resolves_dependencies(tmp_path, agen
         format="json",
     )
 
-    agents = {agent.name: agent for agent in agents_client_mock.list_agents()}
+    agents = {agent.name: agent for agent in await agents_client_mock.list_agents()}
 
     assert set(agents.keys()) == {"child", "parent"}
     parent_tools = agents["parent"].tools
@@ -49,16 +51,17 @@ def test_create_or_update_agents_from_files_resolves_dependencies(tmp_path, agen
     assert connected_data["id"] == agents["child"].id
 
 
-def test_download_agent_writes_generalized_payload(tmp_path, agents_client_mock):
+@pytest.mark.asyncio
+async def test_download_agent_writes_generalized_payload(tmp_path, agents_client_mock):
     """Verify download normalizes names and connected agent references."""
 
     prefix = "prod-"
     suffix = "-v1"
     # Create child then parent with explicit IDs to mirror prior fixture structure
-    child_agent = agents_client_mock.create_agent(
+    child_agent = await agents_client_mock.create_agent(
         id="child-id", name=f"{prefix}child{suffix}", tools=[], model="gpt-4", instructions="c"
     )
-    agents_client_mock.create_agent(
+    await agents_client_mock.create_agent(
         id="parent-id",
         name=f"{prefix}parent{suffix}",
         tools=[
@@ -72,7 +75,7 @@ def test_download_agent_writes_generalized_payload(tmp_path, agents_client_mock)
     )
 
     output_dir = tmp_path / "exports"
-    result = download_agent(
+    result = await download_agent(
         agent_name="parent",
         agent_client=agents_client_mock,
         file_path=str(output_dir),
