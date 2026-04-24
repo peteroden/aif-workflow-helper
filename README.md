@@ -22,19 +22,19 @@ export PROJECT_ENDPOINT='https://your-resource.services.ai.azure.com/api/project
 
 ### 2. Install the Package
 
-For development (editable install):
-
 ```bash
-pip install -e .
+pip install aif-workflow-helper
 ```
+This will install all required dependencies automatically.
 
-Or for production:
+
+Or, if you have cloned this repository and prefer to install from local source:
 
 ```bash
 pip install .
 ```
 
-This will install all required dependencies automatically.
+For development, see the [Running Tests Locally](#running-tests-locally) section (editable install).
 
 ### 3. Using the CLI (Recommended)
 
