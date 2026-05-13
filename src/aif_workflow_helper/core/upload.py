@@ -24,7 +24,7 @@ def read_agent_file(file_path: str) -> dict | None:
         file_path_obj = Path(file_path)
         extension = file_path_obj.suffix.lower()
         
-        with open(file_path, 'r') as f:
+        with open(file_path, 'r', encoding='utf-8') as f:
             if extension == '.json':
                 loaded = json.load(f)
             elif extension in ['.yaml', '.yml']:

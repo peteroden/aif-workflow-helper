@@ -23,7 +23,7 @@ def save_agent_file(agent_dict: dict, file_path: Path, format: str = "json") -> 
         True if successful, False otherwise
     """
     try:
-        with open(file_path, 'w') as f:
+        with open(file_path, 'w', encoding='utf-8') as f:
             if format == "json":
                 json.dump(agent_dict, f, indent=2)
             elif format == "yaml":
